@@ -17,7 +17,7 @@ Key project reminders:
 - This is a Next.js `16.2.9` App Router project. Read local Next docs before
   changing Next APIs.
 - `/` is the tool hub and must not be turned back into a redirect.
-- `/trainer` is the active 3Style BLD edge trainer.
+- `/trainer` is the active 3Style BLD trainer for edges and corners.
 - The app is local-first and stores cases/preferences in `localStorage`.
 - Use the existing hydration-safe `useLocalStorage` hook for persisted state.
 - Run `npm run lint` and `npm run build` before handing off.

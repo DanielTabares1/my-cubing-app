@@ -10,7 +10,7 @@ notices.
 # Project Notes For Agents
 
 This project is `my-cubing-tool`, a local-first Next.js app for cubing tools.
-The active MVP is a 3Style BLD edge trainer.
+The active MVP is a 3Style BLD trainer for edges and corners.
 
 ## Before Editing
 

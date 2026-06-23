@@ -1,29 +1,11 @@
-/**
- * CSV Parser Module
- * Wraps PapaParse to parse CSV files and validate 22x22 matrix structure.
- * Requirements: 1.1, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 14.1, 14.3, 15.1
- */
-
 import Papa from 'papaparse';
 import type { ParsedMatrix, ValidationResult } from './types';
 
-// Letters A through V (22 letters)
-const VALID_HEADERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'] as const;
-const EXPECTED_HEADER_COUNT = 22;
+export const ALLOWED_MATRIX_SIZES = [21, 22] as const;
+export type MatrixSize = (typeof ALLOWED_MATRIX_SIZES)[number];
 
-/**
- * Parses a CSV File using PapaParse and returns a typed ParsedMatrix.
- *
- * The expected CSV layout is:
- *   Row 0  : [ignored/empty, ColA, ColB, ..., ColV]  (23 cells)
- *   Row 1  : [RowA, cell(A,A), cell(A,B), ..., cell(A,V)]
- *   ...
- *   Row 22 : [RowV, cell(V,A), ..., cell(V,V)]
- *
- * @param file - The CSV File to parse
- * @returns A resolved Promise with the ParsedMatrix
- * @throws An Error with a descriptive message on parse or structure failure
- */
+const LETTER_HEADER_PATTERN = /^[A-Z]$/i;
+
 export async function parseCSVFile(file: File): Promise<ParsedMatrix> {
   return new Promise((resolve, reject) => {
     Papa.parse<string[]>(file, {
@@ -32,63 +14,101 @@ export async function parseCSVFile(file: File): Promise<ParsedMatrix> {
       transform: (value: string) => value.trim(),
       complete: (results) => {
         try {
-          const matrix = buildParsedMatrix(results.data as string[][]);
-          resolve(matrix);
+          resolve(buildParsedMatrix(results.data as string[][]));
         } catch (error) {
           reject(error);
         }
       },
       error: (error) => {
-        reject(new Error(`Could not parse CSV file: ${error.message}`));
+        reject(new Error(`No se pudo leer el archivo CSV: ${error.message}`));
       },
     });
   });
 }
 
-/**
- * Builds a ParsedMatrix from the raw 2D array produced by PapaParse.
- *
- * Expects:
- *  - At least 23 rows  (1 header row + 22 data rows)
- *  - At least 23 cols  (1 header col + 22 data cols)
- *  - Row headers  in column 0, rows 1–22
- *  - Column headers in row 0, cols 1–22
- *  - Data in rows 1–22, cols 1–22
- */
-function buildParsedMatrix(raw: string[][]): ParsedMatrix {
-  if (!raw || raw.length < 23) {
-    const found = raw ? raw.length : 0;
-    throw new Error(
-      `Invalid matrix structure: Expected at least 23 rows (1 header + 22 data) but found ${found}.`
-    );
+function validateRawCsvGrid(raw: string[][]): ValidationResult {
+  const errors: string[] = [];
+
+  if (!raw || raw.length === 0) {
+    errors.push('El archivo CSV está vacío.');
+    return { isValid: false, errors };
   }
 
-  // Column headers: row 0, cols 1–22
   const headerRow = raw[0];
-  if (!headerRow || headerRow.length < 23) {
-    const found = headerRow ? headerRow.length : 0;
-    throw new Error(
-      `Invalid matrix structure: Expected at least 23 columns (1 header + 22 data) in header row but found ${found}.`
+  if (!headerRow || headerRow.length < 2) {
+    errors.push(
+      'La primera fila debe incluir una celda vacía en la esquina y las letras de columna.',
+    );
+    return { isValid: false, errors };
+  }
+
+  const columnCount = headerRow.length - 1;
+  if (!ALLOWED_MATRIX_SIZES.includes(columnCount as MatrixSize)) {
+    errors.push(
+      `Se esperaban exactamente 21 o 22 letras de columna, pero se encontraron ${columnCount}.`,
+    );
+    return { isValid: false, errors };
+  }
+
+  const size = columnCount as MatrixSize;
+  const expectedRows = size + 1;
+  const expectedCols = size + 1;
+
+  if (raw.length !== expectedRows) {
+    errors.push(
+      `Se esperaban exactamente ${expectedRows} filas (1 cabecera + ${size} de datos), ` +
+        `pero el archivo tiene ${raw.length}. ` +
+        'Quita filas vacías, conteos o notas después de la matriz.',
     );
   }
 
-  const columnHeaders = headerRow.slice(1, 23);
+  if (headerRow.length !== expectedCols) {
+    errors.push(
+      `La fila de cabecera debe tener exactamente ${expectedCols} columnas ` +
+        `(esquina vacía + ${size} letras), pero tiene ${headerRow.length}.`,
+    );
+  }
 
-  // Row headers: col 0, rows 1–22
-  const rowHeaders: string[] = [];
-  for (let r = 1; r <= 22; r++) {
-    if (!raw[r] || raw[r].length < 23) {
-      throw new Error(
-        `Invalid matrix structure: Row ${r} has fewer than 23 columns (expected 1 header + 22 data).`
+  for (let rowIndex = 1; rowIndex <= size; rowIndex++) {
+    const row = raw[rowIndex];
+    if (!row) {
+      errors.push(`Falta la fila de datos ${rowIndex + 1} de la hoja.`);
+      continue;
+    }
+
+    if (row.length !== expectedCols) {
+      errors.push(
+        `La fila ${rowIndex + 1} debe tener exactamente ${expectedCols} columnas, ` +
+          `pero tiene ${row.length}.`,
       );
     }
-    rowHeaders.push(raw[r][0]);
   }
 
-  // Data: rows 1–22, cols 1–22
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+function buildParsedMatrix(raw: string[][]): ParsedMatrix {
+  const shape = validateRawCsvGrid(raw);
+  if (!shape.isValid) {
+    throw new Error(shape.errors.join(' '));
+  }
+
+  const size = (raw[0].length - 1) as MatrixSize;
+  const totalCols = size + 1;
+
+  const columnHeaders = raw[0].slice(1, totalCols).map((header) => header.toUpperCase());
+  const rowHeaders: string[] = [];
+
+  for (let rowIndex = 1; rowIndex <= size; rowIndex++) {
+    rowHeaders.push(raw[rowIndex][0].toUpperCase());
+  }
+
   const data: string[][] = [];
-  for (let r = 1; r <= 22; r++) {
-    data.push(raw[r].slice(1, 23));
+  for (let rowIndex = 1; rowIndex <= size; rowIndex++) {
+    data.push(raw[rowIndex].slice(1, totalCols));
   }
 
   return {
@@ -100,69 +120,47 @@ function buildParsedMatrix(raw: string[][]): ParsedMatrix {
   };
 }
 
-/**
- * Validates that a ParsedMatrix conforms to the expected 22×22 structure with
- * letters A–V as both row and column headers.
- *
- * Validation rules (from Requirements 2.1–2.6):
- *  1. Exactly 22 row headers
- *  2. Exactly 22 column headers
- *  3. Row headers are letters A–V (in order)
- *  4. Column headers are letters A–V (in order)
- *  5. Data grid is exactly 22 rows
- *  6. Each data row has exactly 22 columns
- *
- * Cell A1 (the top-left corner of the raw CSV, row 0 col 0) is allowed to be
- * empty or contain any text — it is intentionally ignored.
- *
- * @param matrix - The ParsedMatrix to validate
- * @returns A ValidationResult indicating success or listing all errors
- */
 export function validateMatrixStructure(matrix: ParsedMatrix): ValidationResult {
   const errors: string[] = [];
-
-  // --- Row header validation ---
   const { rows, columns } = matrix.headers;
+  const size = rows.length;
 
-  if (rows.length !== EXPECTED_HEADER_COUNT) {
+  if (!ALLOWED_MATRIX_SIZES.includes(size as MatrixSize)) {
     errors.push(
-      `Expected ${EXPECTED_HEADER_COUNT} row headers but found ${rows.length}.`
+      `Se esperaban ${ALLOWED_MATRIX_SIZES.join(' o ')} letras de fila, pero se encontraron ${size}.`,
     );
   } else {
-    rows.forEach((header, index) => {
-      if (header !== VALID_HEADERS[index]) {
-        errors.push(
-          `Row header at position ${index + 1} should be '${VALID_HEADERS[index]}' but found '${header}'.`
-        );
-      }
-    });
+    validateLetterHeaders(rows, 'fila', errors);
   }
 
-  // --- Column header validation ---
-  if (columns.length !== EXPECTED_HEADER_COUNT) {
+  if (!ALLOWED_MATRIX_SIZES.includes(columns.length as MatrixSize)) {
     errors.push(
-      `Expected ${EXPECTED_HEADER_COUNT} column headers but found ${columns.length}.`
+      `Se esperaban ${ALLOWED_MATRIX_SIZES.join(' o ')} letras de columna, pero se encontraron ${columns.length}.`,
     );
   } else {
-    columns.forEach((header, index) => {
-      if (header !== VALID_HEADERS[index]) {
-        errors.push(
-          `Column header at position ${index + 1} should be '${VALID_HEADERS[index]}' but found '${header}'.`
-        );
-      }
-    });
+    validateLetterHeaders(columns, 'columna', errors);
+
+    if (ALLOWED_MATRIX_SIZES.includes(rows.length as MatrixSize)) {
+      columns.forEach((header, index) => {
+        if (header !== rows[index]) {
+          errors.push(
+            `La letra de columna en la posición ${index + 1} debe coincidir con la letra de fila '${rows[index]}', ` +
+              `pero se encontró '${header}'.`,
+          );
+        }
+      });
+    }
   }
 
-  // --- Data grid validation ---
-  if (matrix.data.length !== EXPECTED_HEADER_COUNT) {
+  if (!ALLOWED_MATRIX_SIZES.includes(matrix.data.length as MatrixSize)) {
     errors.push(
-      `Expected ${EXPECTED_HEADER_COUNT} data rows but found ${matrix.data.length}.`
+      `Se esperaban ${ALLOWED_MATRIX_SIZES.join(' o ')} filas de datos, pero se encontraron ${matrix.data.length}.`,
     );
   } else {
     matrix.data.forEach((row, rowIndex) => {
-      if (row.length !== EXPECTED_HEADER_COUNT) {
+      if (row.length !== size) {
         errors.push(
-          `Data row ${rowIndex + 1} has ${row.length} columns but expected ${EXPECTED_HEADER_COUNT}.`
+          `La fila de datos ${rowIndex + 1} tiene ${row.length} columnas, pero se esperaban ${size}.`,
         );
       }
     });
@@ -172,4 +170,33 @@ export function validateMatrixStructure(matrix: ParsedMatrix): ValidationResult 
     isValid: errors.length === 0,
     errors,
   };
+}
+
+function validateLetterHeaders(
+  headers: string[],
+  label: 'fila' | 'columna',
+  errors: string[],
+) {
+  const seen = new Set<string>();
+
+  headers.forEach((header, index) => {
+    if (!LETTER_HEADER_PATTERN.test(header)) {
+      errors.push(
+        `La letra de ${label} en la posición ${index + 1} debe ser una sola letra, ` +
+          `pero se encontró '${header}'.`,
+      );
+      return;
+    }
+
+    const normalized = header.toUpperCase();
+    if (seen.has(normalized)) {
+      errors.push(
+        `La letra '${header}' aparece más de una vez en las cabeceras de ${label}. ` +
+          'Cada letra debe ser única.',
+      );
+      return;
+    }
+
+    seen.add(normalized);
+  });
 }

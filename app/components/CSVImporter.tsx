@@ -4,12 +4,16 @@ import { useCallback, useRef, useState } from 'react'
 import type { TrainingCase } from '@/app/lib/types'
 import { parseCSVFile, validateMatrixStructure } from '@/app/lib/csv-parser'
 import { transformMatrices } from '@/app/lib/matrix-transformer'
+import { mergeCasesByType, normalizeTrainingCases } from '@/app/lib/training-cases'
 
 interface CSVImporterProps {
+  existingCases: TrainingCase[]
   onImportComplete: (cases: TrainingCase[]) => void
   onError: (error: string) => void
+  onDismiss?: () => void
 }
 
+type FileKind = 'memo' | 'algo-arista' | 'algo-esquina'
 type FileStatus = 'idle' | 'success' | 'error'
 
 interface FileState {
@@ -24,45 +28,72 @@ const initialFileState: FileState = {
   errorMessage: null,
 }
 
-export default function CSVImporter({ onImportComplete, onError }: CSVImporterProps) {
-  const [algoState, setAlgoState] = useState<FileState>(initialFileState)
+const FILE_LABELS: Record<FileKind, string> = {
+  memo: 'Memos (obligatorio)',
+  'algo-arista': 'Algoritmos aristas',
+  'algo-esquina': 'Algoritmos esquinas',
+}
+
+export default function CSVImporter({
+  existingCases,
+  onImportComplete,
+  onError,
+  onDismiss,
+}: CSVImporterProps) {
   const [memoState, setMemoState] = useState<FileState>(initialFileState)
+  const [edgeAlgoState, setEdgeAlgoState] = useState<FileState>(initialFileState)
+  const [cornerAlgoState, setCornerAlgoState] = useState<FileState>(initialFileState)
   const [isProcessing, setIsProcessing] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
+  const [importSummary, setImportSummary] = useState<string | null>(null)
 
-  const algoInputRef = useRef<HTMLInputElement>(null)
   const memoInputRef = useRef<HTMLInputElement>(null)
+  const edgeAlgoInputRef = useRef<HTMLInputElement>(null)
+  const cornerAlgoInputRef = useRef<HTMLInputElement>(null)
 
-  const canProcess = algoState.file !== null && memoState.file !== null && !isProcessing
+  const hasAlgoFile = edgeAlgoState.file !== null || cornerAlgoState.file !== null
+  const canProcess = memoState.file !== null && hasAlgoFile && !isProcessing
+
+  const fileStates: Record<FileKind, FileState> = {
+    memo: memoState,
+    'algo-arista': edgeAlgoState,
+    'algo-esquina': cornerAlgoState,
+  }
+
+  const setFileState = useCallback((kind: FileKind, next: FileState) => {
+    if (kind === 'memo') setMemoState(next)
+    if (kind === 'algo-arista') setEdgeAlgoState(next)
+    if (kind === 'algo-esquina') setCornerAlgoState(next)
+  }, [])
+
+  const applyFile = useCallback((kind: FileKind, file: File) => {
+    setFileState(kind, { file, status: 'idle', errorMessage: null })
+    setGlobalError(null)
+    setImportSummary(null)
+  }, [setFileState])
 
   const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
   }, [])
 
-  const applyFile = useCallback((type: 'algo' | 'memo', file: File) => {
-    const setter = type === 'algo' ? setAlgoState : setMemoState
-    setter({ file, status: 'idle', errorMessage: null })
-    setGlobalError(null)
-  }, [])
-
   const handleDrop = useCallback(
-    (type: 'algo' | 'memo') => (event: React.DragEvent<HTMLDivElement>) => {
+    (kind: FileKind) => (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault()
       event.stopPropagation()
       const droppedFile = event.dataTransfer.files?.[0]
       if (droppedFile) {
-        applyFile(type, droppedFile)
+        applyFile(kind, droppedFile)
       }
     },
     [applyFile],
   )
 
-  function handleInputChange(type: 'algo' | 'memo') {
+  function handleInputChange(kind: FileKind) {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (file) {
-        applyFile(type, file)
+        applyFile(kind, file)
       }
     }
   }
@@ -78,44 +109,101 @@ export default function CSVImporter({ onImportComplete, onError }: CSVImporterPr
     return parsed
   }
 
+  function markSuccess(kind: FileKind) {
+    const current = fileStates[kind]
+    setFileState(kind, { ...current, status: 'success', errorMessage: null })
+  }
+
+  function markError(kind: FileKind, message: string) {
+    const current = fileStates[kind]
+    setFileState(kind, { ...current, status: 'error', errorMessage: message })
+  }
+
   async function processFiles() {
-    if (!algoState.file || !memoState.file) return
+    if (!memoState.file || !hasAlgoFile) return
 
     setIsProcessing(true)
     setGlobalError(null)
-    setAlgoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
-    setMemoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
+    setImportSummary(null)
+
+    if (memoState.file) {
+      setMemoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
+    }
+    if (edgeAlgoState.file) {
+      setEdgeAlgoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
+    }
+    if (cornerAlgoState.file) {
+      setCornerAlgoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
+    }
 
     try {
-      const [algoMatrix, memoMatrix] = await Promise.all([
-        parseAndValidate(algoState.file, 'Matriz de algoritmos'),
-        parseAndValidate(memoState.file, 'Matriz de memos'),
-      ])
+      const memoMatrix = await parseAndValidate(memoState.file, 'Matriz de memos')
+      markSuccess('memo')
 
-      setAlgoState((prev) => ({ ...prev, status: 'success', errorMessage: null }))
-      setMemoState((prev) => ({ ...prev, status: 'success', errorMessage: null }))
+      let mergedCases = normalizeTrainingCases(existingCases)
+      const importedCounts = { aristas: 0, esquinas: 0 }
 
-      const cases = transformMatrices(algoMatrix, memoMatrix)
-      onImportComplete(cases)
+      if (edgeAlgoState.file) {
+        const edgeAlgoMatrix = await parseAndValidate(
+          edgeAlgoState.file,
+          'Matriz de algoritmos (aristas)',
+        )
+        const edgeCases = transformMatrices(edgeAlgoMatrix, memoMatrix, 'arista')
+        mergedCases = mergeCasesByType(mergedCases, edgeCases, 'arista')
+        importedCounts.aristas = edgeCases.length
+        markSuccess('algo-arista')
+      }
+
+      if (cornerAlgoState.file) {
+        const cornerAlgoMatrix = await parseAndValidate(
+          cornerAlgoState.file,
+          'Matriz de algoritmos (esquinas)',
+        )
+        const cornerCases = transformMatrices(cornerAlgoMatrix, memoMatrix, 'esquina')
+        mergedCases = mergeCasesByType(mergedCases, cornerCases, 'esquina')
+        importedCounts.esquinas = cornerCases.length
+        markSuccess('algo-esquina')
+      }
+
+      const summaryParts: string[] = []
+      if (importedCounts.aristas > 0) {
+        summaryParts.push(`${importedCounts.aristas} aristas`)
+      }
+      if (importedCounts.esquinas > 0) {
+        summaryParts.push(`${importedCounts.esquinas} esquinas`)
+      }
+
+      setImportSummary(
+        `Importados ${summaryParts.join(' y ')} (${mergedCases.length} casos en total).`,
+      )
+      onImportComplete(mergedCases)
     } catch (err) {
       const msg =
         err instanceof Error
           ? err.message
           : 'No se pudieron transformar los archivos CSV.'
+
       setGlobalError(msg)
       onError(msg)
 
-      const isAlgoError = msg.includes('algoritmos')
-      const isMemoError = msg.includes('memos')
-      if (isAlgoError || !isMemoError) {
-        setAlgoState((prev) => ({ ...prev, status: 'error', errorMessage: msg }))
+      if (msg.includes('memos')) {
+        markError('memo', msg)
       }
-      if (isMemoError || !isAlgoError) {
-        setMemoState((prev) => ({ ...prev, status: 'error', errorMessage: msg }))
+      if (msg.includes('aristas')) {
+        markError('algo-arista', msg)
+      }
+      if (msg.includes('esquinas')) {
+        markError('algo-esquina', msg)
       }
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const inputRefs: Record<FileKind, React.RefObject<HTMLInputElement | null>> = {
+    memo: memoInputRef,
+    'algo-arista': edgeAlgoInputRef,
+    'algo-esquina': cornerAlgoInputRef,
   }
 
   return (
@@ -123,32 +211,39 @@ export default function CSVImporter({ onImportComplete, onError }: CSVImporterPr
       aria-label="Carga de archivos CSV"
       className="flex flex-col gap-4 rounded-lg border border-white/10 bg-white/[0.035] p-4"
     >
-      <div>
-        <h2 className="text-base font-semibold text-white">Datos de practica</h2>
-        <p className="mt-1 text-sm leading-5 text-stone-400">
-          Sube la matriz de algoritmos y la matriz de memos.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-white">Datos de practica</h2>
+          <p className="mt-1 text-sm leading-5 text-stone-400">
+            Sube el memo compartido y al menos un CSV de algoritmos. Cada archivo debe ser una
+            matriz cuadrada de 21×21 o 22×22, sin filas ni columnas extra al final.
+          </p>
+        </div>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="grid size-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-sm font-semibold text-stone-300 transition hover:bg-white/[0.08] hover:text-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            aria-label="Cerrar carga de archivos"
+          >
+            x
+          </button>
+        )}
       </div>
 
       <div className="grid gap-3">
-        <DropZone
-          label="Algoritmos"
-          type="algo"
-          fileState={algoState}
-          inputRef={algoInputRef}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onInputChange={handleInputChange}
-        />
-        <DropZone
-          label="Memos"
-          type="memo"
-          fileState={memoState}
-          inputRef={memoInputRef}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onInputChange={handleInputChange}
-        />
+        {(['memo', 'algo-arista', 'algo-esquina'] as const).map((kind) => (
+          <DropZone
+            key={kind}
+            label={FILE_LABELS[kind]}
+            kind={kind}
+            fileState={fileStates[kind]}
+            inputRef={inputRefs[kind]}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onInputChange={handleInputChange}
+          />
+        ))}
       </div>
 
       {globalError && (
@@ -157,6 +252,12 @@ export default function CSVImporter({ onImportComplete, onError }: CSVImporterPr
           role="alert"
         >
           {globalError}
+        </p>
+      )}
+
+      {importSummary && !globalError && (
+        <p className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-100">
+          {importSummary}
         </p>
       )}
 
@@ -180,7 +281,7 @@ export default function CSVImporter({ onImportComplete, onError }: CSVImporterPr
 
 function DropZone({
   label,
-  type,
+  kind,
   fileState,
   inputRef,
   onDragOver,
@@ -188,16 +289,12 @@ function DropZone({
   onInputChange,
 }: {
   label: string
-  type: 'algo' | 'memo'
+  kind: FileKind
   fileState: FileState
   inputRef: React.RefObject<HTMLInputElement | null>
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void
-  onDrop: (
-    type: 'algo' | 'memo',
-  ) => (event: React.DragEvent<HTMLDivElement>) => void
-  onInputChange: (
-    type: 'algo' | 'memo',
-  ) => (event: React.ChangeEvent<HTMLInputElement>) => void
+  onDrop: (kind: FileKind) => (event: React.DragEvent<HTMLDivElement>) => void
+  onInputChange: (kind: FileKind) => (event: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -218,7 +315,7 @@ function DropZone({
           }
         }}
         onDragOver={onDragOver}
-        onDrop={onDrop(type)}
+        onDrop={onDrop(kind)}
       >
         <span
           className="grid size-9 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-xs font-semibold text-stone-300"
@@ -250,7 +347,7 @@ function DropZone({
           className="sr-only"
           aria-hidden="true"
           tabIndex={-1}
-          onChange={onInputChange(type)}
+          onChange={onInputChange(kind)}
         />
       </div>
 

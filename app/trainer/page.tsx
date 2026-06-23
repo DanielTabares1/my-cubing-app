@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { TrainingCase, UserPreferences } from '@/app/lib/types'
+import type { PieceType, TrainingCase, UserPreferences } from '@/app/lib/types'
 import { StorageManager } from '@/app/lib/storage-manager'
+import { caseKey, countCasesByType, filterCasesByPiece, normalizeTrainingCases } from '@/app/lib/training-cases'
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
 import { useTrainerState } from '@/app/hooks/useTrainerState'
 import { useKeyboardShortcuts } from '@/app/hooks/useKeyboardShortcuts'
@@ -15,19 +16,34 @@ const DEFAULT_PREFS: UserPreferences = {
   timerVisible: true,
   selectionMode: 'random',
   algorithmStep: true,
+  practicePiece: 'arista',
   theme: 'dark',
 }
 
+const EMPTY_TRAINING_CASES: TrainingCase[] = []
+
 export default function TrainerPage() {
-  const [cases, setCases] = useLocalStorage<TrainingCase[]>('bld-trainer-cases', [])
+  const [cases, setCases] = useLocalStorage<TrainingCase[]>('bld-trainer-cases', EMPTY_TRAINING_CASES)
   const [prefs, setPrefs] = useLocalStorage<UserPreferences>('bld-trainer-prefs', DEFAULT_PREFS)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [importPanelOpen, setImportPanelOpen] = useState(false)
   const algorithmStep = prefs.algorithmStep ?? DEFAULT_PREFS.algorithmStep
+  const practicePiece = prefs.practicePiece ?? DEFAULT_PREFS.practicePiece
+
+  const normalizedCases = useMemo(() => normalizeTrainingCases(cases), [cases])
+  const hasCases = normalizedCases.length > 0
+  const showImportPanel = !hasCases || importPanelOpen
+  const caseCounts = useMemo(() => countCasesByType(normalizedCases), [normalizedCases])
+  const practiceCases = useMemo(
+    () => filterCasesByPiece(normalizedCases, practicePiece),
+    [normalizedCases, practicePiece],
+  )
 
   const { state, currentCase, advance, reset, startPractice, practiceCase } = useTrainerState(
-    cases,
+    practiceCases,
     prefs.selectionMode,
     algorithmStep,
+    practicePiece,
   )
 
   const prevStateRef = useRef(state)
@@ -66,6 +82,7 @@ export default function TrainerPage() {
       }
       setCases(newCases)
       setErrorMessage(null)
+      setImportPanelOpen(false)
     },
     [setCases],
   )
@@ -78,6 +95,7 @@ export default function TrainerPage() {
     StorageManager.clearTrainingCases()
     setCases([])
     setErrorMessage(null)
+    setImportPanelOpen(true)
   }, [setCases])
 
   const handleToggleTimerVisibility = useCallback(() => {
@@ -96,6 +114,10 @@ export default function TrainerPage() {
       ...prev,
       algorithmStep: !(prev.algorithmStep ?? DEFAULT_PREFS.algorithmStep),
     }))
+  }, [setPrefs])
+
+  const handlePracticePieceChange = useCallback((piece: PieceType) => {
+    setPrefs((prev) => ({ ...prev, practicePiece: piece }))
   }, [setPrefs])
 
   return (
@@ -121,6 +143,7 @@ export default function TrainerPage() {
           <div className="flex flex-wrap items-center gap-3">
             <VisualTimer
               isVisible={prefs.timerVisible}
+              isRunning={state > 0 && currentCase !== null}
               onToggleVisibility={handleToggleTimerVisibility}
               shouldReset={timerResetToken}
             />
@@ -160,6 +183,13 @@ export default function TrainerPage() {
               />
               {algorithmStep ? 'Memo + algoritmo' : 'Solo memo'}
             </button>
+
+            <PracticePieceToggle
+              value={practicePiece}
+              onChange={handlePracticePieceChange}
+              edgeCount={caseCounts.aristas}
+              cornerCount={caseCounts.esquinas}
+            />
           </div>
         </header>
 
@@ -182,46 +212,75 @@ export default function TrainerPage() {
 
         <section className="grid flex-1 gap-5 py-5 lg:grid-cols-[340px_1fr]">
           <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:self-start">
-            <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
-                Estado
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Metric label="Casos" value={cases.length.toString()} />
-                <Metric
-                  label="Modo"
-                  value={prefs.selectionMode === 'random' ? 'Mix' : 'Seq'}
-                />
-                <Metric label="Revision" value={algorithmStep ? 'Alg' : 'Memo'} />
-              </div>
-            </div>
-
-            <CaseSearch
-              cases={cases}
-              currentPar={currentCase?.par ?? null}
-              onSelectCase={practiceCase}
-            />
-
-            <CSVImporter onImportComplete={handleImportComplete} onError={handleError} />
-
-            {cases.length > 0 && (
+            {showImportPanel ? (
+              <CSVImporter
+                existingCases={normalizedCases}
+                onImportComplete={handleImportComplete}
+                onError={handleError}
+                onDismiss={hasCases ? () => setImportPanelOpen(false) : undefined}
+              />
+            ) : (
               <button
                 type="button"
-                onClick={handleClearData}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-300/30 bg-red-400/10 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-400/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                onClick={() => setImportPanelOpen(true)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-stone-100 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
-                Borrar datos cargados
+                <span
+                  className="grid size-7 place-items-center rounded-md border border-white/10 bg-stone-950/60 text-xs font-bold text-cyan-200"
+                  aria-hidden="true"
+                >
+                  CSV
+                </span>
+                Actualizar archivos CSV
               </button>
+            )}
+
+            {hasCases && (
+              <>
+                <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
+                    Estado
+                  </p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <Metric label="Aristas" value={caseCounts.aristas.toString()} />
+                    <Metric label="Esquinas" value={caseCounts.esquinas.toString()} />
+                    <Metric label="Total" value={caseCounts.total.toString()} />
+                    <Metric
+                      label="Modo"
+                      value={prefs.selectionMode === 'random' ? 'Mix' : 'Seq'}
+                    />
+                    <Metric label="Revision" value={algorithmStep ? 'Alg' : 'Memo'} />
+                    <Metric
+                      label="Practica"
+                      value={practicePiece === 'arista' ? 'Arista' : 'Esquina'}
+                    />
+                  </div>
+                </div>
+
+                <CaseSearch
+                  cases={practiceCases}
+                  currentCase={currentCase}
+                  onSelectCase={practiceCase}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleClearData}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-300/30 bg-red-400/10 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-400/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                >
+                  Borrar datos cargados
+                </button>
+              </>
             )}
           </aside>
 
-          <section className="flex min-w-0 items-center justify-center rounded-xl border border-white/10 bg-[radial-gradient(circle_at_30%_20%,rgba(103,232,249,0.08),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015))] p-3 sm:p-6">
+          <section className="flex min-w-0 self-start justify-center rounded-xl border border-white/10 bg-[radial-gradient(circle_at_30%_20%,rgba(103,232,249,0.08),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015))] p-3 sm:p-6">
             <TrainerCard
               state={state}
               currentCase={currentCase}
               onAdvance={state === 0 ? startPractice : advance}
               onReset={reset}
-              totalCases={cases.length}
+              totalCases={practiceCases.length}
               algorithmStep={algorithmStep}
             />
           </section>
@@ -240,13 +299,76 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function PracticePieceToggle({
+  value,
+  onChange,
+  edgeCount,
+  cornerCount,
+}: {
+  value: PieceType
+  onChange: (piece: PieceType) => void
+  edgeCount: number
+  cornerCount: number
+}) {
+  return (
+    <div
+      className="inline-flex min-h-10 items-center rounded-lg border border-white/10 bg-white/[0.04] p-1"
+      role="group"
+      aria-label="Tipo de pieza a practicar"
+    >
+      <PieceToggleButton
+        label="Aristas"
+        count={edgeCount}
+        isActive={value === 'arista'}
+        onClick={() => onChange('arista')}
+      />
+      <PieceToggleButton
+        label="Esquinas"
+        count={cornerCount}
+        isActive={value === 'esquina'}
+        onClick={() => onChange('esquina')}
+      />
+    </div>
+  )
+}
+
+function PieceToggleButton({
+  label,
+  count,
+  isActive,
+  onClick,
+}: {
+  label: string
+  count: number
+  isActive: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={count === 0}
+      aria-pressed={isActive}
+      className={[
+        'inline-flex min-h-8 items-center gap-2 rounded-md px-3 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40',
+        isActive
+          ? 'bg-cyan-200/15 text-cyan-50'
+          : 'text-stone-300 hover:bg-white/[0.06] hover:text-stone-100',
+      ].join(' ')}
+    >
+      <span>{label}</span>
+      <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-stone-300">{count}</span>
+    </button>
+  )
+}
+
 function CaseSearch({
   cases,
-  currentPar,
+  currentCase,
   onSelectCase,
 }: {
   cases: TrainingCase[]
-  currentPar: string | null
+  currentCase: TrainingCase | null
   onSelectCase: (trainingCase: TrainingCase) => void
 }) {
   const [query, setQuery] = useState('')
@@ -309,10 +431,10 @@ function CaseSearch({
         )}
 
         {matches.map((trainingCase) => {
-          const isActive = trainingCase.par === currentPar
+          const isActive = currentCase !== null && caseKey(trainingCase) === caseKey(currentCase)
           return (
             <button
-              key={trainingCase.par}
+              key={caseKey(trainingCase)}
               type="button"
               onClick={() => onSelectCase(trainingCase)}
               className={[

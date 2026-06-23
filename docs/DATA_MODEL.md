@@ -1,57 +1,98 @@
 # Data Model
 
-Last updated: 2026-06-23
+Last updated: 2026-06-22
 
-## Domain Type
+## Domain Types
 
-The central type is `TrainingCase`.
+### `PieceType`
+
+```ts
+type PieceType = 'arista' | 'esquina'
+```
+
+### `TrainingCase`
+
+The central training record:
 
 ```ts
 interface TrainingCase {
+  tipo: PieceType
   par: string
   memo: string
   algoritmo: string
+  algoritmos?: string[]
 }
 ```
 
 Field meaning:
 
+- `tipo`: edge or corner case.
 - `par`: two-letter case pair, row header + column header.
 - `memo`: memo word/image for the pair.
-- `algoritmo`: 3Style algorithm notation.
+- `algoritmo`: original 3-style algorithm cell text.
+- `algoritmos`: optional cleaned variants split from multiline algorithm cells.
+
+Legacy stored cases without `tipo` are normalized to `arista` at read time.
 
 ## CSV Matrix Format
 
-The app expects two separate CSV files:
+The importer accepts up to three files per session:
 
-- Algorithm matrix.
-- Memo matrix.
+- one shared **memo** matrix (required),
+- one **edge algorithm** matrix (optional),
+- one **corner algorithm** matrix (optional).
 
-Each file must contain a matrix with 22 row headers and 22 column headers.
+At least one algorithm file must be provided.
 
-Raw shape:
+### Sizes
+
+| Piece type | Matrix size | Typical letter count |
+|------------|-------------|----------------------|
+| Edges | 22×22 | 22 |
+| Corners | 21×21 | 21 |
+
+### Strict grid rules
+
+Parsed CSV files must match the matrix exactly:
+
+- `N+1` rows total (`1` header row + `N` data rows).
+- `N+1` columns per row (`1` row-header column + `N` data columns).
+- No trailing blank rows, counts, or notes after row `N+1`.
+- `N` must be `21` or `22`.
+
+### Header layout
+
+For edges (`N = 22`):
 
 ```text
       A   B   C   ... V
 A   ...
 B   ...
-C   ...
 ...
 V   ...
 ```
 
-In spreadsheet coordinates:
+Spreadsheet coordinates:
 
 - `A1`: ignored.
 - `B1:W1`: column headers.
 - `A2:A23`: row headers.
 - `B2:W23`: data cells.
 
-Headers must be exactly:
+For corners (`N = 21`), the grid ends at column/row `U`.
 
-```text
-A B C D E F G H I J K L M N O P Q R S T U V
-```
+Headers must be unique single-letter labels. Row and column headers must use
+the same labels in the same order. Headers are normalized to uppercase during
+import.
+
+### Shared memo behavior
+
+Memo lookup uses header labels, not only row/column indices. This allows a
+22×22 memo matrix to serve a 21×21 corner algorithm matrix when every corner
+header exists in the memo matrix.
+
+`validateMemoCoversAlgo()` checks that all algorithm headers are present in the
+memo matrix before transformation.
 
 ## Parsing
 
@@ -61,8 +102,9 @@ File:
 app/lib/csv-parser.ts
 ```
 
-Public functions:
+Public symbols:
 
+- `ALLOWED_MATRIX_SIZES = [21, 22]`
 - `parseCSVFile(file: File): Promise<ParsedMatrix>`
 - `validateMatrixStructure(matrix: ParsedMatrix): ValidationResult`
 
@@ -72,15 +114,16 @@ Parser:
 - Does not treat the first row as named headers.
 - Trims cell values.
 - Does not skip empty lines automatically.
+- Infers matrix size from the header row.
+- Reads only the first `N` data rows; rejects extra trailing rows.
 
-Validation checks:
+Structural validation checks:
 
-- At least 23 raw rows.
-- At least 23 raw columns in the header row.
-- 22 row headers.
-- 22 column headers.
-- Headers match `A` through `V`, in order.
-- Data grid is exactly 22x22.
+- `N` is 21 or 22.
+- `N` unique row headers and `N` unique column headers.
+- Headers are single letters.
+- Row and column headers match in the same order.
+- Data grid is `N×N`.
 
 ## Transformation
 
@@ -90,34 +133,55 @@ File:
 app/lib/matrix-transformer.ts
 ```
 
-Public function:
+Public functions:
 
 ```ts
-transformMatrices(algoMatrix, memoMatrix): TrainingCase[]
+transformMatrices(
+  algoMatrix: ParsedMatrix,
+  memoMatrix: ParsedMatrix,
+  pieceType: PieceType,
+): TrainingCase[]
+
+validateMemoCoversAlgo(
+  algoMatrix: ParsedMatrix,
+  memoMatrix: ParsedMatrix,
+): ValidationResult
 ```
 
 Rules:
 
 - Iterate every coordinate in the algorithm matrix.
 - Skip empty algorithm cells.
-- Skip algorithm cells equal to `Caso no existe`, case-insensitive.
+- Skip algorithm cells that mark a non-existent case.
 - Pair is `rowHeader + columnHeader`.
-- Memo is the memo matrix value at the same coordinate.
+- Memo is resolved from the memo matrix by matching header labels.
 - Empty memo becomes `Sin palabra`.
+- Multiline algorithm cells are split into variants using line breaks.
+- The original cell text remains in `algoritmo`.
+- The cleaned list is stored in `algoritmos`.
+- `tipo` is set from the import context.
 
-Example:
+## Case helpers
 
-```ts
-{
-  par: "GA",
-  memo: "Gaara",
-  algoritmo: "U R U' R'"
-}
+File:
+
+```text
+app/lib/training-cases.ts
 ```
 
-## Persistence
+Public helpers:
 
-The app stores data in browser `localStorage`.
+- `normalizeTrainingCase`
+- `normalizeTrainingCases`
+- `mergeCasesByType`
+- `countCasesByType`
+- `filterCasesByPiece`
+- `caseKey`
+
+`mergeCasesByType` replaces only the imported piece type and keeps the other
+type's cases intact.
+
+## Persistence
 
 Keys:
 
@@ -139,6 +203,7 @@ interface UserPreferences {
   timerVisible: boolean
   selectionMode: 'random' | 'sequential'
   algorithmStep: boolean
+  practicePiece: PieceType
   theme: 'light' | 'dark' | 'system'
 }
 ```
@@ -146,25 +211,35 @@ interface UserPreferences {
 Important:
 
 - `theme` exists in the type but the app currently renders a fixed dark theme.
-- `algorithmStep=false` means the trainer skips the algorithm reveal step.
-- Existing stored preferences may not include newer fields; callers should use
+- `algorithmStep=false` skips the algorithm reveal step.
+- `practicePiece` controls which cases are practiced and searched.
+- Existing stored preferences may omit newer fields; callers should use
   fallback defaults with nullish coalescing.
 
 ## Storage Helpers
 
-There are two storage layers:
-
 - `app/hooks/useLocalStorage.ts`: React hook for persisted state.
 - `app/lib/storage-manager.ts`: imperative helpers for cases and preferences.
 
-The trainer page currently uses `useLocalStorage` for reactive persistence and
+The trainer page uses `useLocalStorage` for reactive persistence and
 `StorageManager` for explicit case save/clear operations.
 
 ## Hydration Rule
 
 Do not read `localStorage` during the first client render in a way that changes
-the rendered HTML compared with the server output. This already caused a timer
-visibility hydration mismatch.
+the rendered HTML compared with the server output.
 
-Use the existing `useLocalStorage` hook when possible.
+Use the existing `useLocalStorage` hook when possible. Pass stable default
+values from module-level constants, not inline literals like `[]`.
 
+## Example Files
+
+```text
+examples/sample-memos.csv
+examples/sample-algorithms.csv
+examples/sample-algorithms-corners.csv
+```
+
+- Memo and edge examples are 22×22.
+- Corner algorithm example is 21×21.
+- All examples are sparse but structurally valid.

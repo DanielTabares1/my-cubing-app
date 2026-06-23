@@ -1,9 +1,9 @@
 # My Cubing Tool
 
 My Cubing Tool is an offline-first Next.js app for speedcubing practice tools.
-The current MVP focuses on a 3Style BLD edge trainer, but the home page is now a
-tool selector so more utilities can be added later without changing the product
-entry point.
+The current MVP is a 3Style BLD trainer for edges and corners. The home page is
+a tool selector so more utilities can be added later without changing the
+product entry point.
 
 ## Current Product
 
@@ -15,19 +15,23 @@ entry point.
 
 ## Main Features
 
-- Import two 22x22 CSV matrices: algorithms and memo words.
-- Flatten matrices into searchable training cases.
-- Practice flashcard flow:
+- Import CSV matrices for a shared memo plus edge and/or corner algorithms.
+- Practice edges or corners with a header toggle (`Aristas` / `Esquinas`).
+- Separate sidebar counts for edges, corners, and total cases.
+- Flashcard flow:
   - `Idle -> Pair recognition -> Memo -> Algorithm -> Next case`
   - Optional `Solo memo` mode:
     `Idle -> Pair recognition -> Memo -> Next case`
-- Search cases by letter pair from the sidebar.
+- Search cases by letter pair within the active piece type.
 - Jump directly to a searched case.
 - Random or sequential case selection.
 - Visual timer that resets on each new case.
 - Keyboard shortcuts:
   - `Space`: advance the current practice step.
   - `R`: repeat the same case when available.
+- The timer stays at `0.00` until a case is active.
+- Collapsible CSV import panel: visible first, hidden after import, reopenable
+  via **Actualizar archivos CSV**.
 
 ## Tech Stack
 
@@ -58,45 +62,85 @@ npm run build
 npm run test
 ```
 
-Known current lint warning:
-
-- `app/lib/__tests__/matrix-transformer.test.ts`: `validHeadersArb` is unused.
-  This warning predates the latest UI/documentation work.
-
 ## CSV Input Format
 
-Both CSV files must represent the same 22x22 matrix layout:
+### Files
 
-- Row `1` contains column headers in cells `B1:W1`.
-- Column `A` contains row headers in cells `A2:A23`.
-- Headers must be the letters `A` through `V`, in order.
-- Data lives in `B2:W23`.
+| File | Required | Purpose |
+|------|----------|---------|
+| Memo matrix | Yes | Shared memo words for both piece types |
+| Edge algorithms | No* | 22×22 edge 3-style algorithms |
+| Corner algorithms | No* | 21×21 corner 3-style algorithms |
 
-The algorithm CSV controls which cases exist:
+\*At least one algorithm file (edges or corners) is required per import.
+
+Imports merge by piece type: re-importing edges does not remove corner cases.
+
+### Matrix shape
+
+Each CSV must be a **strict** square matrix:
+
+- **22×22** for edges (22 letter headers).
+- **21×21** for corners (21 letter headers).
+
+Layout:
+
+- Row `1`: empty top-left cell, then column headers.
+- Rows `2…N+1`: row header in column `A`, then data cells.
+- Exactly `N+1` rows and `N+1` columns in the parsed file — no trailing blank
+  rows, counts, or notes after the matrix.
+
+Headers must be unique single letters. Row and column headers must match in the
+same order. Headers are normalized to uppercase during import.
+
+The shared memo matrix can be 22×22 while corner algorithms are 21×21. Memo
+lookup uses header letters, so the memo file only needs to contain every letter
+used by the algorithm matrix being imported.
+
+### Case filtering
+
+The algorithm matrix decides which cases exist:
 
 - Empty algorithm cells are skipped.
-- Algorithm cells equal to `Caso no existe` are skipped, case-insensitive.
+- Flexible non-existent-case markers are skipped (`Caso no existe`, `N/A`, `x`,
+  `-`, etc.).
 - Memo cells may be empty; they become `Sin palabra`.
+- Multiline algorithm cells become multiple variants for the same pair.
 
 Flattened case shape:
 
 ```ts
 interface TrainingCase {
+  tipo: 'arista' | 'esquina'
   par: string
   memo: string
   algoritmo: string
+  algoritmos?: string[]
 }
 ```
 
-Example case:
+Example edge case:
 
 ```ts
 {
-  par: "AD",
-  memo: "Adios",
+  tipo: 'arista',
+  par: 'AD',
+  memo: 'Adios',
   algoritmo: "U R U' R'"
 }
 ```
+
+Legacy stored cases without `tipo` are treated as `arista`.
+
+## Example CSV Files
+
+Small valid examples live in `examples/`:
+
+- `examples/sample-memos.csv` — 22×22 shared memo template
+- `examples/sample-algorithms.csv` — 22×22 edge algorithms
+- `examples/sample-algorithms-corners.csv` — 21×21 corner algorithms
+
+Use them as upload templates. They are sparse but structurally valid.
 
 ## Important Files
 
@@ -109,6 +153,7 @@ Example case:
 - `app/hooks/useLocalStorage.ts`: hydration-safe localStorage state.
 - `app/lib/csv-parser.ts`: PapaParse wrapper and matrix validation.
 - `app/lib/matrix-transformer.ts`: matrix-to-cases transformation.
+- `app/lib/training-cases.ts`: merge, filter, and count helpers.
 - `app/lib/types.ts`: shared domain types.
 
 More detailed notes live in `docs/`.
@@ -121,4 +166,3 @@ More detailed notes live in `docs/`.
 - `docs/HANDOFF.md`: current state, known issues, future work.
 - `requirements.md`: live product requirements for the MVP.
 - `AGENTS.md`: mandatory agent instructions and project-specific guardrails.
-

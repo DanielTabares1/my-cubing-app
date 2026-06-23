@@ -1,237 +1,218 @@
-/**
- * CSV Parser property-based tests.
- * Feature: 3style-bld-edge-trainer
- *
- * Tests:
- *   Property 1 — Matrix Structure Validation
- *   Property 2 — Matrix Validation Rejects Malformed Input
- *   Property 8 — Pretty Printer Round-Trip Preservation
- */
-
-import { describe, expect } from 'vitest';
+import { describe, expect, test as vitestTest } from 'vitest';
 import { fc, test } from '@fast-check/vitest';
+import Papa from 'papaparse';
 
-import { validateMatrixStructure } from '../csv-parser';
+import { parseCSVFile, validateMatrixStructure } from '../csv-parser';
 import { prettyPrintMatrix } from '../matrix-transformer';
 import type { ParsedMatrix } from '../types';
 
-// ---------------------------------------------------------------------------
-// Shared helpers / generators
-// ---------------------------------------------------------------------------
+const HEADER_POOL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const matrixSizeArb = fc.constantFrom(21, 22);
 
-const VALID_HEADERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'] as const;
-
-/** Arbitrary that always produces the full 22-letter A–V array. */
-const validHeadersArb = fc.constant([...VALID_HEADERS]);
-
-/** Arbitrary that produces a single cell value (any trimmed string). */
-const cellValueArb = fc.string({ maxLength: 20 });
-
-/** Arbitrary that produces a 22×22 data grid of strings. */
-const dataGridArb = fc.array(
-  fc.array(cellValueArb, { minLength: 22, maxLength: 22 }),
-  { minLength: 22, maxLength: 22 }
+const validHeadersArb = matrixSizeArb.chain((size) =>
+  fc.uniqueArray(fc.constantFrom(...HEADER_POOL), {
+    minLength: size,
+    maxLength: size,
+  }),
 );
 
-/** Arbitrary that produces a fully valid ParsedMatrix. */
-const validMatrixArb: fc.Arbitrary<ParsedMatrix> = fc.record({
-  headers: fc.record({
-    rows: validHeadersArb,
-    columns: validHeadersArb,
-  }),
-  data: dataGridArb,
+const validMatrixArb: fc.Arbitrary<ParsedMatrix> = validHeadersArb.chain((headers) => {
+  const size = headers.length;
+  const cellValueArb = fc.string({ maxLength: 20 });
+  const dataGridArb = fc.array(
+    fc.array(cellValueArb, { minLength: size, maxLength: size }),
+    { minLength: size, maxLength: size },
+  );
+
+  return dataGridArb.map((data) => ({
+    headers: {
+      rows: headers,
+      columns: headers,
+    },
+    data,
+  }));
 });
 
-// ---------------------------------------------------------------------------
-// Property 1 — Matrix Structure Validation
-// ---------------------------------------------------------------------------
-
-// Feature: 3style-bld-edge-trainer, Property 1: Matrix Structure Validation
-
 describe('Property 1: Matrix Structure Validation', () => {
-  /**
-   * For any valid 22×22 matrix with correct A–V headers, validateMatrixStructure
-   * must return isValid: true with no errors.
-   *
-   * **Validates: Requirements 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6**
-   */
   test.prop([validMatrixArb], { numRuns: 100 })(
-    'validateMatrixStructure returns isValid: true for any well-formed matrix',
+    'validateMatrixStructure returns isValid: true for any well-formed personal letter scheme',
     (matrix) => {
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
-    }
+    },
   );
 });
-
-// ---------------------------------------------------------------------------
-// Property 2 — Matrix Validation Rejects Malformed Input
-// ---------------------------------------------------------------------------
-
-// Feature: 3style-bld-edge-trainer, Property 2: Matrix Validation Rejects Malformed Input
 
 describe('Property 2: Matrix Validation Rejects Malformed Input', () => {
-  /**
-   * A matrix with fewer than 22 row headers must be rejected.
-   *
-   * **Validates: Requirements 1.4, 2.4**
-   */
   test.prop(
     [
-      fc.array(fc.constantFrom(...VALID_HEADERS), { minLength: 0, maxLength: 21 }),
-      dataGridArb,
+      fc
+        .tuple(fc.integer({ min: 0, max: 20 }), fc.integer({ min: 21, max: 22 }))
+        .filter(([rowCount, colCount]) => rowCount !== colCount || (rowCount !== 21 && rowCount !== 22)),
     ],
-    { numRuns: 100 }
+    { numRuns: 100 },
   )(
-    'rejects matrices with fewer than 22 row headers',
-    (rows, data) => {
+    'rejects matrices with unsupported row header counts',
+    ([rowCount, colCount]) => {
+      const headers = HEADER_POOL.slice(0, colCount);
+      const rows = HEADER_POOL.slice(0, rowCount);
       const matrix: ParsedMatrix = {
-        headers: { rows, columns: [...VALID_HEADERS] },
-        data,
+        headers: { rows, columns: headers },
+        data: Array.from({ length: rows.length }, () => Array(colCount).fill('')),
       };
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-    }
+    },
   );
 
-  /**
-   * A matrix with fewer than 22 column headers must be rejected.
-   *
-   * **Validates: Requirements 1.4, 2.4**
-   */
   test.prop(
     [
-      fc.array(fc.constantFrom(...VALID_HEADERS), { minLength: 0, maxLength: 21 }),
-      dataGridArb,
+      fc
+        .tuple(fc.integer({ min: 0, max: 20 }), fc.integer({ min: 21, max: 22 }))
+        .filter(([colCount, rowCount]) => colCount !== rowCount || (colCount !== 21 && colCount !== 22)),
     ],
-    { numRuns: 100 }
+    { numRuns: 100 },
   )(
-    'rejects matrices with fewer than 22 column headers',
-    (columns, data) => {
+    'rejects matrices with unsupported column header counts',
+    ([colCount, rowCount]) => {
+      const rows = HEADER_POOL.slice(0, rowCount);
+      const columns = HEADER_POOL.slice(0, colCount);
       const matrix: ParsedMatrix = {
-        headers: { rows: [...VALID_HEADERS], columns },
-        data,
+        headers: { rows, columns },
+        data: Array.from({ length: rows.length }, () => Array(columns.length).fill('')),
       };
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-    }
+    },
   );
 
-  /**
-   * A matrix with more than 22 row headers must be rejected.
-   *
-   * **Validates: Requirements 1.4, 2.4**
-   */
   test.prop(
     [
-      fc.array(fc.constantFrom(...VALID_HEADERS), { minLength: 23, maxLength: 30 }),
-      dataGridArb,
+      fc.integer({ min: 21, max: 22 }),
+      fc.integer({ min: 0, max: 20 }),
+      fc.constantFrom('', 'AA', '1', '-'),
     ],
-    { numRuns: 100 }
+    { numRuns: 100 },
   )(
-    'rejects matrices with more than 22 row headers',
-    (rows, data) => {
+    'rejects matrices with invalid row headers',
+    (size, replaceIndex, invalidHeader) => {
+      const headers = HEADER_POOL.slice(0, size);
+      const rows = [...headers];
+      rows[replaceIndex] = invalidHeader;
       const matrix: ParsedMatrix = {
-        headers: { rows, columns: [...VALID_HEADERS] },
-        data,
+        headers: { rows, columns: headers },
+        data: Array.from({ length: size }, () => Array(size).fill('')),
       };
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-    }
+    },
   );
 
-  /**
-   * A matrix where at least one header is not a letter A–V must be rejected.
-   * We generate a 22-element array, replace one element with an invalid letter.
-   *
-   * **Validates: Requirements 1.4, 2.4**
-   */
   test.prop(
-    [
-      fc.integer({ min: 0, max: 21 }),
-      // Use a letter outside A–V range
-      fc.string({ minLength: 1, maxLength: 3 }).filter(
-        (s) => !VALID_HEADERS.includes(s as typeof VALID_HEADERS[number])
-      ),
-    ],
-    { numRuns: 100 }
+    [fc.integer({ min: 21, max: 22 }), fc.integer({ min: 1, max: 20 })],
+    { numRuns: 100 },
   )(
-    'rejects matrices with invalid header letters in row headers',
-    (replaceIndex, invalidLetter) => {
-      const rows = [...VALID_HEADERS] as string[];
-      rows[replaceIndex] = invalidLetter;
+    'rejects matrices with duplicate row headers',
+    (size, replaceIndex) => {
+      const headers = HEADER_POOL.slice(0, size);
+      const rows = [...headers];
+      rows[replaceIndex] = rows[0];
       const matrix: ParsedMatrix = {
-        headers: { rows, columns: [...VALID_HEADERS] },
-        data: Array.from({ length: 22 }, () => Array(22).fill('')),
+        headers: { rows, columns: headers },
+        data: Array.from({ length: size }, () => Array(size).fill('')),
       };
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-    }
+    },
   );
 
-  /**
-   * A matrix where at least one column header is not a letter A–V must be rejected.
-   *
-   * **Validates: Requirements 1.4, 2.4**
-   */
   test.prop(
-    [
-      fc.integer({ min: 0, max: 21 }),
-      fc.string({ minLength: 1, maxLength: 3 }).filter(
-        (s) => !VALID_HEADERS.includes(s as typeof VALID_HEADERS[number])
-      ),
-    ],
-    { numRuns: 100 }
+    [fc.integer({ min: 21, max: 22 }), fc.integer({ min: 0, max: 19 })],
+    { numRuns: 100 },
   )(
-    'rejects matrices with invalid header letters in column headers',
-    (replaceIndex, invalidLetter) => {
-      const columns = [...VALID_HEADERS] as string[];
-      columns[replaceIndex] = invalidLetter;
+    'rejects matrices whose column headers do not match row headers',
+    (size, swapIndex) => {
+      const headers = HEADER_POOL.slice(0, size);
+      const columns = [...headers];
+      [columns[swapIndex], columns[swapIndex + 1]] = [
+        columns[swapIndex + 1],
+        columns[swapIndex],
+      ];
       const matrix: ParsedMatrix = {
-        headers: { rows: [...VALID_HEADERS], columns },
-        data: Array.from({ length: 22 }, () => Array(22).fill('')),
+        headers: { rows: headers, columns },
+        data: Array.from({ length: size }, () => Array(size).fill('')),
       };
       const result = validateMatrixStructure(matrix);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-    }
+    },
   );
 });
 
-// ---------------------------------------------------------------------------
-// Property 8 — Pretty Printer Round-Trip Preservation
-// ---------------------------------------------------------------------------
+describe('Strict CSV grid shape', () => {
+  vitestTest('accepts a square matrix with no trailing rows or columns', async () => {
+    const headers = HEADER_POOL.slice(0, 22);
+    const csv = Papa.unparse([
+      ['', ...headers],
+      ...headers.map((rowHeader) => [rowHeader, ...Array(22).fill('algo')]),
+    ]);
 
-// Feature: 3style-bld-edge-trainer, Property 8: Pretty Printer Round-Trip Preservation
+    const file = new File([csv], 'aristas.csv', { type: 'text/csv' });
+    const matrix = await parseCSVFile(file);
+    const validation = validateMatrixStructure(matrix);
+
+    expect(validation.isValid).toBe(true);
+    expect(matrix.headers.rows).toHaveLength(22);
+    expect(matrix.headers.columns).toHaveLength(22);
+    expect(matrix.data).toHaveLength(22);
+  });
+
+  vitestTest('rejects blank or metadata rows after the data grid', async () => {
+    const headers = HEADER_POOL.slice(0, 22);
+    const csv = Papa.unparse([
+      ['', ...headers],
+      ...headers.map((rowHeader) => [rowHeader, ...Array(22).fill('algo')]),
+      ['', ...Array(22).fill('')],
+      ['', 'Conteo:', '40', ...Array(19).fill('')],
+    ]);
+
+    const file = new File([csv], 'aristas.csv', { type: 'text/csv' });
+
+    await expect(parseCSVFile(file)).rejects.toThrow(/exactamente 23 filas/i);
+  });
+
+  vitestTest('rejects matrices with too few data rows', async () => {
+    const headers = HEADER_POOL.slice(0, 22);
+    const csv = Papa.unparse([
+      ['', ...headers],
+      ...headers.slice(0, 10).map((rowHeader) => [rowHeader, ...Array(22).fill('algo')]),
+    ]);
+
+    const file = new File([csv], 'incomplete.csv', { type: 'text/csv' });
+
+    await expect(parseCSVFile(file)).rejects.toThrow(/exactamente 23 filas/i);
+  });
+});
 
 describe('Property 8: Pretty Printer Round-Trip Preservation', () => {
-  /**
-   * For any valid ParsedMatrix, prettyPrintMatrix must produce a string that
-   * contains all row headers, all column headers, and all non-empty data values.
-   *
-   * **Validates: Requirements 16.2, 16.3**
-   */
   test.prop([validMatrixArb], { numRuns: 100 })(
     'pretty printer output contains all row headers, column headers, and data values',
     (matrix) => {
       const output = prettyPrintMatrix(matrix);
 
-      // All row headers must appear in the output
       for (const rowHeader of matrix.headers.rows) {
         expect(output).toContain(rowHeader);
       }
 
-      // All column headers must appear in the output
       for (const colHeader of matrix.headers.columns) {
         expect(output).toContain(colHeader);
       }
 
-      // All non-empty data values must appear in the output
       for (const row of matrix.data) {
         for (const cell of row) {
           if (cell !== '') {
@@ -239,6 +220,6 @@ describe('Property 8: Pretty Printer Round-Trip Preservation', () => {
           }
         }
       }
-    }
+    },
   );
 });

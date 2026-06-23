@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-06-23
+Last updated: 2026-06-22
 
 ## Commands
 
@@ -45,14 +45,8 @@ npm run test:watch
 As of the latest handoff:
 
 - `npm run build` passes.
-- `npm run lint` passes with one known warning.
-
-Known lint warning:
-
-```text
-app/lib/__tests__/matrix-transformer.test.ts
-validHeadersArb is assigned a value but never used
-```
+- `npm run lint` passes.
+- `npm run test` passes.
 
 ## Coding Conventions
 
@@ -63,6 +57,7 @@ validHeadersArb is assigned a value but never used
 - Keep `TrainerCard` mostly presentational.
 - Keep page-level orchestration in `app/trainer/page.tsx`.
 - Avoid adding dependencies unless there is a clear need.
+- Pass stable module-level defaults into `useLocalStorage` (never inline `[]`).
 
 ## Styling Conventions
 
@@ -72,6 +67,7 @@ validHeadersArb is assigned a value but never used
 - Keep controls compact and stable.
 - Keep dark theme low-glare.
 - Use responsive classes for mobile and desktop.
+- Anchor the trainer card near the top of the main column.
 
 ## Next.js Version Gotchas
 
@@ -81,13 +77,6 @@ Before changing Next-specific APIs, read local docs under:
 
 ```text
 node_modules/next/dist/docs/
-```
-
-Useful docs:
-
-```text
-node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md
-node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.md
 ```
 
 ## Hydration Gotchas
@@ -100,10 +89,12 @@ Avoid:
 - Reading `localStorage` in `useState(() => ...)`.
 - Rendering different HTML based on `typeof window`.
 - Rendering different HTML based on time/random values.
+- Passing unstable inline defaults such as `useLocalStorage(key, [])`.
 
 Use:
 
 - `useLocalStorage` for persisted state.
+- Module-level constants for default values.
 - Effects or subscriptions for browser-only synchronization after hydration.
 
 ## Adding A New Tool
@@ -131,6 +122,7 @@ If changing CSV behavior:
 
 - Update `app/lib/csv-parser.ts`.
 - Update `app/lib/matrix-transformer.ts`.
+- Update `app/lib/training-cases.ts` when merge/filter behavior changes.
 - Update tests in `app/lib/__tests__/`.
 - Update `docs/DATA_MODEL.md`.
 
@@ -141,12 +133,16 @@ After UI changes:
 1. Start dev server.
 2. Open `/`.
 3. Open 3Style Trainer.
-4. Upload `Memo BLD - Aristas.csv` as algorithms.
-5. Upload `Memo BLD - Memo.csv` as memos.
-6. Import cases.
-7. Start practice.
-8. Press `Space` through the flow.
-9. Toggle `Solo memo`.
-10. Search a pair and select it.
-11. Toggle timer visibility and reload to confirm no hydration error.
-
+4. Confirm the CSV import panel is visible when no cases are loaded.
+5. Upload `examples/sample-memos.csv` as memo.
+6. Upload `examples/sample-algorithms.csv` as edge algorithms.
+7. Import cases and confirm the import panel closes.
+8. Confirm sidebar shows edge count and **Actualizar archivos CSV**.
+9. Start practice for edges.
+10. Confirm the timer starts only after a case is active.
+11. Press `Space` through the flow.
+12. Toggle `Solo memo`.
+13. Switch practice to corners after importing
+    `examples/sample-algorithms-corners.csv`.
+14. Search a pair and select it.
+15. Toggle timer visibility and reload to confirm no hydration error.
