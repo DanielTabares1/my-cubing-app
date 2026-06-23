@@ -5,18 +5,24 @@ import { formatTime } from '@/app/lib/format-time'
 
 interface VisualTimerProps {
   isVisible: boolean
+  isRunning: boolean
   onToggleVisibility: () => void
   shouldReset: boolean
 }
 
 export default function VisualTimer({
   isVisible,
+  isRunning,
   onToggleVisibility,
   shouldReset,
 }: VisualTimerProps) {
   const [elapsedMs, setElapsedMs] = useState(0)
 
   useEffect(() => {
+    if (!isRunning) {
+      return
+    }
+
     let startTime: number | null = null
     let frameId: number
 
@@ -33,13 +39,15 @@ export default function VisualTimer({
     return () => {
       cancelAnimationFrame(frameId)
     }
-  }, [shouldReset])
+  }, [isRunning, shouldReset])
+
+  const displayedMs = isRunning ? elapsedMs : 0
 
   return (
     <div className="inline-flex min-h-10 items-center rounded-lg border border-white/10 bg-white/[0.04] text-sm text-stone-200">
       {isVisible && (
         <span className="min-w-[104px] px-3 font-mono text-base tabular-nums text-white">
-          {formatTime(elapsedMs)}
+          {formatTime(displayedMs)}
         </span>
       )}
       <button

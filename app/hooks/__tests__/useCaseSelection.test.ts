@@ -20,7 +20,7 @@ import type { TrainingCase } from '../../lib/types';
 
 /** Build a minimal TrainingCase for testing. */
 function makeCase(par: string): TrainingCase {
-  return { par, memo: 'Test memo', algoritmo: 'R U R\'' };
+  return { par, tipo: 'arista', memo: 'Test memo', algoritmo: 'R U R\'' };
 }
 
 /**

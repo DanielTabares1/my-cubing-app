@@ -15,8 +15,8 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
-import type { TrainingCase, TrainerState, UseTrainerStateReturn } from '../lib/types';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { PieceType, TrainingCase, TrainerState, UseTrainerStateReturn } from '../lib/types';
 import { useCaseSelection } from './useCaseSelection';
 
 /**
@@ -31,11 +31,22 @@ export function useTrainerState(
   cases: TrainingCase[],
   selectionMode: 'random' | 'sequential' = 'random',
   algorithmStep = true,
+  practicePiece: PieceType = 'arista',
 ): UseTrainerStateReturn {
   const [state, setState] = useState<TrainerState>(0);
   const [currentCase, setCurrentCase] = useState<TrainingCase | null>(null);
 
   const { selectCase } = useCaseSelection(cases);
+  const sessionKeyRef = useRef(`${practicePiece}:${cases.length}`);
+
+  useEffect(() => {
+    const nextSessionKey = `${practicePiece}:${cases.length}`;
+    if (sessionKeyRef.current === nextSessionKey) return;
+
+    setState(0);
+    setCurrentCase(null);
+    sessionKeyRef.current = nextSessionKey;
+  }, [cases.length, practicePiece]);
 
   // -------------------------------------------------------------------------
   // startPractice: 0 → 1 (select first case)

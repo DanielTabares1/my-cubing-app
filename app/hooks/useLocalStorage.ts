@@ -55,7 +55,9 @@ export function useLocalStorage<T>(
       console.warn(`useLocalStorage: error reading key "${key}" from localStorage:`, error)
       return initialValue
     }
-  }, [initialValue, key, rawValue])
+    // `initialValue` must be a stable module-level constant at call sites.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit unstable inline defaults
+  }, [key, rawValue])
 
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {

@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-06-23
+Last updated: 2026-06-22
 
 ## Overview
 
@@ -8,7 +8,7 @@ My Cubing Tool is a Next.js App Router project with a local-first client-side
 data model. It currently has two public routes:
 
 - `/`: tool hub.
-- `/trainer`: 3Style BLD edge trainer.
+- `/trainer`: 3Style BLD trainer for edges and corners.
 
 The app has no backend. Runtime data comes from uploaded CSV files and
 `localStorage`.
@@ -27,19 +27,36 @@ app/
 
 `app/trainer/page.tsx` owns page-level state and wires together:
 
-- `CSVImporter`: imports and validates CSVs, then emits `TrainingCase[]`.
+- `CSVImporter`: imports memo plus optional edge/corner algorithm CSVs.
 - `TrainerCard`: presentational practice card.
 - `VisualTimer`: case timer.
 - `CaseSearch`: local component for searching by letter pair.
 - `Metric`: local component for sidebar status counters.
+- `PracticePieceToggle`: edge/corner practice filter in the header.
 
 The page is also responsible for:
 
 - Persisted cases and preferences.
+- Collapsible import panel visibility.
+- Filtering practice cases by `practicePiece`.
 - Timer reset token.
 - Error banner.
 - Header controls.
 - Passing the correct advance handler to `TrainerCard`.
+
+## Sidebar Behavior
+
+When no cases are loaded:
+
+- Only the CSV import panel is shown.
+
+When cases exist and the import panel is closed:
+
+- **Actualizar archivos CSV** reopens import.
+- Status metrics show edge, corner, and total counts.
+- Case search and clear-data controls are available.
+
+After a successful import, the import panel closes automatically.
 
 ## Core Hooks
 
@@ -53,9 +70,7 @@ Hydration-safe persisted state hook.
 - Browser snapshot reads the raw `localStorage` string.
 - Writes dispatch a custom `local-storage:${key}` event so same-tab subscribers
   update immediately.
-
-Use this hook for persisted UI state. Avoid ad hoc `localStorage` reads in
-render or `useState` initializers.
+- Call sites should pass stable module-level defaults.
 
 ### `useTrainerState`
 
@@ -63,9 +78,10 @@ State machine for practice.
 
 Inputs:
 
-- `cases`
+- `cases` (already filtered to the active piece type)
 - `selectionMode`
 - `algorithmStep`
+- `practicePiece`
 
 Returns:
 
@@ -86,6 +102,8 @@ States:
 If `algorithmStep` is false, advancing from state `2` selects the next case
 instead of entering state `3`.
 
+The hook resets to idle when `practicePiece` or the filtered case count changes.
+
 ### `useCaseSelection`
 
 Selects next case randomly or sequentially.
@@ -101,13 +119,16 @@ Global keyboard handler while the trainer is active.
 ## Data Flow
 
 ```text
-CSV files
+Memo CSV + optional edge/corner algo CSVs
   -> CSVImporter
   -> parseCSVFile
   -> validateMatrixStructure
-  -> transformMatrices
+  -> validateMemoCoversAlgo
+  -> transformMatrices(pieceType)
+  -> mergeCasesByType
   -> TrainingCase[]
   -> localStorage + React state
+  -> filterCasesByPiece(practicePiece)
   -> TrainerCard / CaseSearch
 ```
 
@@ -116,9 +137,15 @@ CSV files
 `VisualTimer` does not decide which case is active. The page flips a boolean
 `timerResetToken` whenever a new recognition state starts or the selected case
 changes. `VisualTimer` restarts its animation loop whenever that token changes.
+The timer only runs when `isRunning` is true, which currently means the trainer
+has an active case. In idle state it displays `0.00` and does not schedule
+animation frames.
 
-This matters for search: selecting a case while already in state `1` still
-resets the timer because the current pair changed.
+## Layout Notes
+
+- The trainer card column uses `self-start` so the card stays near the top.
+- The import panel is the first sidebar block when visible.
+- `TrainerCard` uses a compact natural-height layout during active practice.
 
 ## Styling
 
@@ -141,4 +168,3 @@ For route files and Link behavior, see:
 node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md
 node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.md
 ```
-

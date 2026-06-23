@@ -1,12 +1,12 @@
 # Product Requirements: My Cubing Tool MVP
 
-Last updated: 2026-06-23
+Last updated: 2026-06-22
 
 ## Product Direction
 
 My Cubing Tool is a local-first workspace for cubing utilities. The app is
-expected to grow into multiple tools, but the current MVP only ships the 3Style
-BLD edge trainer.
+expected to grow into multiple tools, but the current MVP ships the 3Style BLD
+trainer for edges and corners.
 
 The first screen must let the user choose which tool to open. Today, only
 3Style Trainer is active; future tools may be shown as disabled placeholders.
@@ -36,7 +36,7 @@ Requirements:
 
 ### `/trainer`
 
-3Style BLD edge trainer.
+3Style BLD trainer for edges and corners.
 
 Requirements:
 
@@ -44,43 +44,76 @@ Requirements:
 - Keep the trainer card as the primary focus.
 - Keep import, search, and status controls in a sidebar.
 - Support desktop and mobile viewport widths.
+- Let the user choose whether to practice edges or corners.
 
 ## Data Import
 
-The user uploads two CSV files:
+The user uploads up to three CSV files:
 
-- Algorithm matrix.
-- Memo matrix.
+- **Memo matrix** (required).
+- **Edge algorithm matrix** (optional).
+- **Corner algorithm matrix** (optional).
 
-Both files must be 22x22 matrices using letters `A` through `V`.
+At least one algorithm file is required per import.
 
-Expected raw CSV shape:
+### Matrix sizes
 
-- Row 0: ignored top-left cell, then column headers `A` through `V`.
-- Rows 1-22: row header in column 0, then 22 data cells.
+- Edges: **22×22** personal letter scheme.
+- Corners: **21×21** personal letter scheme.
+- The memo file is shared. A 22×22 memo can serve 21×21 corner algorithms when
+  corner headers are a subset of the memo headers.
 
-Validation:
+### Expected raw CSV shape
 
-- Exactly 22 row headers are expected.
-- Exactly 22 column headers are expected.
-- Row and column headers must be `A` through `V`, in order.
-- Every data row must have 22 columns.
+For an `N×N` matrix (`N` is 21 or 22):
 
-Transformation:
+- Row 0: ignored top-left cell, then `N` column headers.
+- Rows 1–N: row header in column 0, then `N` data cells.
+- Exactly `N+1` rows total in the file — no extra footer rows.
 
-- The algorithm matrix decides which cases exist.
+### Validation
+
+- `N` must be 21 or 22.
+- Exactly `N` row headers and `N` column headers.
+- Row and column headers must be single-letter labels.
+- Header labels must be unique.
+- Row and column headers must use the same labels in the same order.
+- Headers are normalized to uppercase during import.
+- Every data row must have exactly `N+1` columns (row header + data).
+- Parsed file must not contain trailing blank rows or spreadsheet notes after
+  the matrix.
+
+### Transformation
+
+- Each algorithm matrix is imported with a piece type (`arista` or `esquina`).
+- The algorithm matrix decides which cases exist for that type.
 - Empty algorithm cells are skipped.
-- Algorithm cells equal to `Caso no existe` are skipped, case-insensitive.
+- Algorithm cells with flexible non-existent-case markers are skipped.
+- Algorithm cells with line breaks are treated as multiple algorithm variants
+  for the same pair.
 - Memo cells may be empty; empty memo values become `Sin palabra`.
-- Each valid cell becomes:
+- Re-importing one piece type replaces only that type's cases and keeps the
+  other type intact.
+
+Each valid cell becomes:
 
 ```ts
 interface TrainingCase {
+  tipo: 'arista' | 'esquina'
   par: string
   memo: string
   algoritmo: string
+  algoritmos?: string[]
 }
 ```
+
+### Import UI
+
+- The CSV import panel is the primary sidebar content when no cases are loaded.
+- After a successful import, hide the import panel and show status, search, and
+  data management controls.
+- Provide a control to reopen the import panel for updates.
+- Allow dismissing the import panel without importing when cases already exist.
 
 ## Persistence
 
@@ -98,6 +131,7 @@ interface UserPreferences {
   timerVisible: boolean
   selectionMode: 'random' | 'sequential'
   algorithmStep: boolean
+  practicePiece: 'arista' | 'esquina'
   theme: 'light' | 'dark' | 'system'
 }
 ```
@@ -108,6 +142,7 @@ Hydration requirement:
 - Do not read localStorage in a `useState` initializer that runs during the
   first client render.
 - The current hook uses `useSyncExternalStore` for this reason.
+- Call sites must pass stable module-level defaults (not inline `[]` literals).
 
 ## Trainer Flow
 
@@ -132,19 +167,25 @@ Idle -> Pair -> Memo -> Next Pair
 
 Requirements:
 
+- Practice only cases matching the active piece type (`practicePiece`).
 - Primary button advances the current flow.
 - `Space` triggers the same advance behavior.
 - In algorithm mode, state `3` shows a repeat button.
 - `R` repeats the same case from active states.
 - Timer resets whenever a new case starts, including a case selected from
   search.
+- Timer must not start when the app opens or while the trainer is idle.
+- Timer displays `0.00` until a case is active.
+- Switching piece type or changing the active case pool resets the session to
+  idle.
 
 ## Case Search
 
-The trainer sidebar must include a case search.
+The trainer sidebar must include a case search when cases are loaded.
 
 Requirements:
 
+- Search only within the active piece type.
 - Search by letter pair.
 - Accept lowercase input but normalize to uppercase.
 - Ignore non-letter characters.
@@ -152,10 +193,19 @@ Requirements:
 - Selecting a result starts that exact case in recognition state.
 - Selecting a case should reset the visual timer.
 
+## Sidebar Status
+
+When cases are loaded, show separate counts for:
+
+- edge cases,
+- corner cases,
+- total cases.
+
 ## UI Principles
 
 - Dark, low-glare interface for long practice sessions.
-- Stable dimensions for the trainer card to avoid jarring layout shifts.
+- Trainer card anchored near the top of the main column (no vertical centering
+  that forces scroll).
 - No decorative marketing landing page as the main product surface.
 - The first viewport should be useful.
 - Controls should be explicit and compact.
@@ -173,8 +223,13 @@ npm run test
 
 At minimum, run `lint` and `build` for UI-only changes.
 
-Known warning:
+## Example Files
 
-- `app/lib/__tests__/matrix-transformer.test.ts` has an unused
-  `validHeadersArb` warning.
+The repository includes small valid upload examples:
 
+- `examples/sample-memos.csv`
+- `examples/sample-algorithms.csv`
+- `examples/sample-algorithms-corners.csv`
+
+They should remain sparse and easy to inspect while preserving the required
+matrix structure.

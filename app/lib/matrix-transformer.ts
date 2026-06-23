@@ -1,41 +1,81 @@
 /**
  * Matrix Transformer Module
- * Converts two 22×22 CSV matrices into a flat array of TrainingCase objects,
- * and provides a pretty-printer for debugging.
- * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 16.1, 16.2, 16.3
- *
- * NOTE: Full implementation lives in Task 4.1.
- * This file is created early so that csv-parser tests (Task 3.4) can import
- * prettyPrintMatrix without a missing-module error.
+ * Converts algorithm and memo CSV matrices into TrainingCase objects.
  */
 
-import type { ParsedMatrix, TrainingCase } from './types';
+import type { ParsedMatrix, PieceType, TrainingCase, ValidationResult } from './types';
+import { splitAlgorithmVariants } from './algorithm-variants';
+import { isNonExistentCaseCell } from './case-filter';
+
+function getMemoCell(memoMatrix: ParsedMatrix, rowHeader: string, colHeader: string): string {
+  const rowIndex = memoMatrix.headers.rows.indexOf(rowHeader);
+  const colIndex = memoMatrix.headers.columns.indexOf(colHeader);
+
+  if (rowIndex === -1 || colIndex === -1) return '';
+
+  return memoMatrix.data[rowIndex]?.[colIndex] ?? '';
+}
+
+export function validateMemoCoversAlgo(
+  algoMatrix: ParsedMatrix,
+  memoMatrix: ParsedMatrix,
+): ValidationResult {
+  const errors: string[] = [];
+
+  for (const header of algoMatrix.headers.rows) {
+    if (!memoMatrix.headers.rows.includes(header)) {
+      errors.push(
+        `La matriz de memos no incluye la letra de fila '${header}' usada en algoritmos.`
+      );
+    }
+  }
+
+  for (const header of algoMatrix.headers.columns) {
+    if (!memoMatrix.headers.columns.includes(header)) {
+      errors.push(
+        `La matriz de memos no incluye la letra de columna '${header}' usada en algoritmos.`
+      );
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
 
 /**
- * Converts a pair of 22×22 matrices (algorithms + memos) into a flat array
- * of TrainingCase objects.  Cells that are empty or equal to "caso no existe"
- * (case-insensitive) are skipped.
+ * Converts an algorithm matrix and a shared memo matrix into training cases.
+ * Memo lookup uses header labels so a larger memo matrix can serve smaller algo matrices.
  */
 export function transformMatrices(
   algoMatrix: ParsedMatrix,
-  memoMatrix: ParsedMatrix
+  memoMatrix: ParsedMatrix,
+  pieceType: PieceType,
 ): TrainingCase[] {
+  const coverage = validateMemoCoversAlgo(algoMatrix, memoMatrix);
+  if (!coverage.isValid) {
+    throw new Error(coverage.errors.join(' '));
+  }
+
   const cases: TrainingCase[] = [];
 
   for (let r = 0; r < algoMatrix.headers.rows.length; r++) {
     for (let c = 0; c < algoMatrix.headers.columns.length; c++) {
       const algoCell = algoMatrix.data[r]?.[c] ?? '';
-      const memoCell = memoMatrix.data[r]?.[c] ?? '';
 
       if (algoCell === '') continue;
-      if (algoCell.toLowerCase() === 'caso no existe') continue;
+      if (isNonExistentCaseCell(algoCell)) continue;
 
       const rowHeader = algoMatrix.headers.rows[r];
       const colHeader = algoMatrix.headers.columns[c];
+      const memoCell = getMemoCell(memoMatrix, rowHeader, colHeader);
 
       cases.push({
+        tipo: pieceType,
         par: rowHeader + colHeader,
         algoritmo: algoCell,
+        algoritmos: splitAlgorithmVariants(algoCell),
         memo: memoCell || 'Sin palabra',
       });
     }
@@ -47,17 +87,10 @@ export function transformMatrices(
 /**
  * Formats a ParsedMatrix as a human-readable aligned table string for
  * debugging purposes.
- *
- * Output format:
- *   [header]  A   B   C  ...  V
- *   A         …   …   …  ...  …
- *   B         …   …   …  ...  …
- *   …
  */
 export function prettyPrintMatrix(matrix: ParsedMatrix): string {
   const { rows, columns } = matrix.headers;
 
-  // Determine column width: max of any cell value or column header
   const colWidth = Math.max(
     ...columns.map((h) => h.length),
     ...matrix.data.flatMap((row) => row.map((cell) => cell.length)),
@@ -66,12 +99,10 @@ export function prettyPrintMatrix(matrix: ParsedMatrix): string {
 
   const pad = (s: string, width: number) => s.padEnd(width, ' ');
 
-  // Header row
   const headerRowStr =
     pad('', colWidth + 2) +
     columns.map((h) => pad(h, colWidth)).join('  ');
 
-  // Data rows
   const dataRows = rows.map((rowHeader, r) => {
     const cells = (matrix.data[r] ?? []).map((cell) => pad(cell, colWidth));
     return pad(rowHeader, colWidth + 2) + cells.join('  ');

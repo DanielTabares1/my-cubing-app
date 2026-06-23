@@ -1,6 +1,7 @@
 'use client'
 
 import type { TrainerState, TrainingCase } from '@/app/lib/types'
+import { splitAlgorithmVariants } from '@/app/lib/algorithm-variants'
 import CaseCountBadge from './CaseCountBadge'
 
 export interface TrainerCardProps {
@@ -44,6 +45,9 @@ export default function TrainerCard({
   const showMemo = state >= 2 && currentCase !== null
   const showAlgo = algorithmStep && state >= 3 && currentCase !== null
   const canStart = state !== 0 || totalCases > 0
+  const algorithmVariants = currentCase
+    ? currentCase.algoritmos ?? splitAlgorithmVariants(currentCase.algoritmo)
+    : []
 
   return (
     <div
@@ -58,7 +62,14 @@ export default function TrainerCard({
         </span>
       </div>
 
-      <div className="grid min-h-[430px] place-items-center py-6 sm:min-h-[460px]">
+      <div
+        className={[
+          'py-4',
+          state === 0
+            ? 'grid min-h-[240px] place-items-center sm:min-h-[280px]'
+            : 'flex flex-col gap-5',
+        ].join(' ')}
+      >
         {state === 0 ? (
           <div className="mx-auto flex max-w-md flex-col items-center text-center">
             <div
@@ -84,12 +95,12 @@ export default function TrainerCard({
             </p>
           </div>
         ) : (
-          <div className="grid w-full gap-5">
+          <>
             <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
                 Par
               </p>
-              <p className="mt-3 min-h-[96px] text-7xl font-black leading-none tracking-normal text-white sm:text-8xl">
+              <p className="mt-3 text-7xl font-black leading-none tracking-normal text-white sm:text-8xl">
                 {showPar ? currentCase.par : '--'}
               </p>
             </section>
@@ -107,14 +118,15 @@ export default function TrainerCard({
               </RevealPanel>
 
               {algorithmStep && (
-                <RevealPanel label="Algoritmo" visible={showAlgo}>
-                  <span className="block break-words font-mono text-base leading-7 text-emerald-100 sm:text-lg">
-                    {currentCase?.algoritmo}
-                  </span>
+                <RevealPanel
+                  label={algorithmVariants.length > 1 ? 'Algoritmos' : 'Algoritmo'}
+                  visible={showAlgo}
+                >
+                  <AlgorithmVariants variants={algorithmVariants} />
                 </RevealPanel>
               )}
             </section>
-          </div>
+          </>
         )}
       </div>
 
@@ -149,6 +161,36 @@ export default function TrainerCard({
   )
 }
 
+function AlgorithmVariants({ variants }: { variants: string[] }) {
+  if (variants.length <= 1) {
+    return (
+      <span className="block break-words font-mono text-base leading-7 text-emerald-100 sm:text-lg">
+        {variants[0]}
+      </span>
+    )
+  }
+
+  return (
+    <div className="max-h-56 overflow-y-auto pr-1">
+      <div className="grid gap-2">
+        {variants.map((variant, index) => (
+          <div
+            key={`${index}-${variant}`}
+            className="grid grid-cols-[2rem_1fr] gap-3 rounded-md border border-white/10 bg-stone-950/55 px-3 py-2"
+          >
+            <span className="mt-0.5 text-xs font-semibold tabular-nums text-stone-500">
+              {index + 1}
+            </span>
+            <span className="break-words font-mono text-sm leading-6 text-emerald-100 sm:text-base">
+              {variant}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function RevealPanel({
   label,
   visible,
@@ -159,11 +201,11 @@ function RevealPanel({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-[132px] rounded-lg border border-white/10 bg-stone-900/70 p-4">
+    <div className="rounded-lg border border-white/10 bg-stone-900/70 p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
         {label}
       </p>
-      <div className="mt-4 flex min-h-[64px] items-center">
+      <div className="mt-3">
         {visible ? (
           <div className="animate-fade-in w-full">{children}</div>
         ) : (

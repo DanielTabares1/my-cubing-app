@@ -7,14 +7,20 @@
 // Core domain types
 // ---------------------------------------------------------------------------
 
+export type PieceType = 'arista' | 'esquina';
+
 /** A single flashcard training case derived from the algorithm and memo matrices. */
 export interface TrainingCase {
+  /** Whether this case is an edge or corner 3-style pair. */
+  tipo: PieceType;
   /** Letter pair (e.g., "AB", "CK") — concatenation of row header + column header. */
   par: string;
   /** Memorization word (e.g., "Airplane"). Defaults to "Sin palabra" when empty. */
   memo: string;
   /** Algorithm notation (e.g., "U R U' R'"). */
   algoritmo: string;
+  /** Algorithm variants split from multiline cells. First item mirrors the primary display variant. */
+  algoritmos?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +53,8 @@ export interface UserPreferences {
   timerVisible: boolean;
   selectionMode: 'random' | 'sequential';
   algorithmStep: boolean;
+  /** Which piece type to practice: edges or corners. */
+  practicePiece: PieceType;
   theme: 'light' | 'dark' | 'system';
 }
 
@@ -54,15 +62,15 @@ export interface UserPreferences {
 // CSV parsing types
 // ---------------------------------------------------------------------------
 
-/** Structured representation of a parsed 22×22 CSV matrix. */
+/** Structured representation of a parsed N×N CSV matrix (N is 21 or 22). */
 export interface ParsedMatrix {
   headers: {
-    /** 22 row header letters (A–V), sourced from column A cells A2:A23. */
+    /** Row header letters, sourced from column A. */
     rows: string[];
-    /** 22 column header letters (A–V), sourced from row 1 cells B1:W1. */
+    /** Column header letters, sourced from row 1. */
     columns: string[];
   };
-  /** 22×22 grid of cell string values. */
+  /** N×N grid of cell string values. */
   data: string[][];
 }
 

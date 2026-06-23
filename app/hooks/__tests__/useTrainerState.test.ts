@@ -16,8 +16,8 @@ import type { TrainingCase } from '../../lib/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeCase(par: string): TrainingCase {
-  return { par, memo: 'Test memo', algoritmo: 'R U R\'' };
+function makeCase(par: string, tipo: TrainingCase['tipo'] = 'arista'): TrainingCase {
+  return { par, tipo, memo: 'Test memo', algoritmo: 'R U R\'' };
 }
 
 const CASES: TrainingCase[] = [
