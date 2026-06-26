@@ -64,12 +64,62 @@ describe('Property 5: Random Case Selection Coverage', () => {
         act(() => {
           selected = result.current.selectCase('random');
         });
-        // The returned case must exist in the original array
         expect(selected).not.toBeNull();
         expect(pars.has((selected as TrainingCase).par)).toBe(true);
       }
     },
   );
+
+  test('random mode covers every case once per shuffled round', () => {
+    const cases = Array.from({ length: 8 }, (_, index) => makeCase(`A${index}`));
+    const { result } = renderHook(() => useCaseSelection(cases));
+
+    const round: string[] = [];
+    for (let index = 0; index < cases.length; index++) {
+      act(() => {
+        const selected = result.current.selectCase('random');
+        if (selected) round.push(selected.par);
+      });
+    }
+
+    expect(round).toHaveLength(cases.length);
+    expect(new Set(round)).toEqual(new Set(cases.map((trainingCase) => trainingCase.par)));
+  });
+
+  test('random mode does not repeat until the round completes', () => {
+    const cases = Array.from({ length: 6 }, (_, index) => makeCase(`B${index}`));
+    const { result } = renderHook(() => useCaseSelection(cases));
+
+    const seen = new Set<string>();
+    for (let index = 0; index < cases.length; index++) {
+      act(() => {
+        const selected = result.current.selectCase('random');
+        if (!selected) return;
+        expect(seen.has(selected.par)).toBe(false);
+        seen.add(selected.par);
+      });
+    }
+  });
+
+  test('notifyCasePracticed removes a manually selected case from the round', () => {
+    const cases = [makeCase('AA'), makeCase('AB'), makeCase('AC')];
+    const { result } = renderHook(() => useCaseSelection(cases));
+
+    act(() => {
+      result.current.notifyCasePracticed(cases[1]);
+    });
+
+    const round: string[] = [];
+    for (let index = 0; index < cases.length - 1; index++) {
+      act(() => {
+        const selected = result.current.selectCase('random');
+        if (selected) round.push(selected.par);
+      });
+    }
+
+    expect(round).toHaveLength(2);
+    expect(round).not.toContain('AB');
+  });
 
   /**
    * When the cases array is empty, `selectCase('random')` must return null.
