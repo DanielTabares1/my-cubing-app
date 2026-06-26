@@ -113,6 +113,8 @@ export interface UseTrainerStateReturn {
 export interface UseCaseSelectionReturn {
   /** Select the next case using the given mode ('random' | 'sequential'). */
   selectCase: (mode: 'random' | 'sequential') => TrainingCase | null;
+  /** Remove a manually chosen case from the remaining shuffled round. */
+  notifyCasePracticed: (trainingCase: TrainingCase) => void;
   /** True when at least one training case is available. */
   hasMoreCases: boolean;
   /** Current sequential index into the cases array. */

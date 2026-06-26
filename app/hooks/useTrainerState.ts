@@ -36,7 +36,7 @@ export function useTrainerState(
   const [state, setState] = useState<TrainerState>(0);
   const [currentCase, setCurrentCase] = useState<TrainingCase | null>(null);
 
-  const { selectCase } = useCaseSelection(cases);
+  const { selectCase, notifyCasePracticed } = useCaseSelection(cases);
   const sessionKeyRef = useRef(`${practicePiece}:${cases.length}`);
 
   useEffect(() => {
@@ -110,9 +110,10 @@ export function useTrainerState(
   }, [state]);
 
   const practiceCase = useCallback((trainingCase: TrainingCase) => {
+    notifyCasePracticed(trainingCase);
     setCurrentCase(trainingCase);
     setState(1);
-  }, []);
+  }, [notifyCasePracticed]);
 
   return { state, currentCase, advance, reset, startPractice, practiceCase };
 }
