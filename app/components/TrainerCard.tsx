@@ -9,6 +9,9 @@ export interface TrainerCardProps {
   currentCase: TrainingCase | null
   onAdvance: () => void
   onReset: () => void
+  onRateGood: () => void
+  onRateBad: () => void
+  onToggleLearned: () => void
   totalCases: number
   algorithmStep: boolean
 }
@@ -26,6 +29,10 @@ function primaryButtonLabel(state: TrainerState, algorithmStep: boolean): string
   }
 }
 
+function isRatingStage(state: TrainerState, algorithmStep: boolean): boolean {
+  return algorithmStep ? state === 3 : state === 2
+}
+
 const stageLabels: Record<TrainerState, string> = {
   0: 'Preparacion',
   1: 'Reconocimiento',
@@ -38,6 +45,9 @@ export default function TrainerCard({
   currentCase,
   onAdvance,
   onReset,
+  onRateGood,
+  onRateBad,
+  onToggleLearned,
   totalCases,
   algorithmStep,
 }: TrainerCardProps) {
@@ -45,6 +55,8 @@ export default function TrainerCard({
   const showMemo = state >= 2 && currentCase !== null
   const showAlgo = algorithmStep && state >= 3 && currentCase !== null
   const canStart = state !== 0 || totalCases > 0
+  const showLearnedToggle = state >= 1 && currentCase !== null
+  const showRating = isRatingStage(state, algorithmStep) && currentCase !== null
   const algorithmVariants = currentCase
     ? currentCase.algoritmos ?? splitAlgorithmVariants(currentCase.algoritmo)
     : []
@@ -57,9 +69,43 @@ export default function TrainerCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
         <CaseCountBadge count={totalCases} />
-        <span className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
-          {stageLabels[state]}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {showLearnedToggle && currentCase && (
+            <button
+              type="button"
+              onClick={onToggleLearned}
+              aria-pressed={currentCase.isLearned ?? false}
+              className={[
+                'inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                currentCase.isLearned
+                  ? 'border-emerald-200/30 bg-emerald-200/10 text-emerald-100'
+                  : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]',
+              ].join(' ')}
+              aria-label={
+                currentCase.isLearned
+                  ? 'Marcar caso como no aprendido'
+                  : 'Marcar caso como aprendido'
+              }
+            >
+              <span
+                className={[
+                  'size-2 rounded-full',
+                  currentCase.isLearned ? 'bg-emerald-300' : 'bg-stone-500',
+                ].join(' ')}
+                aria-hidden="true"
+              />
+              {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
+              {(currentCase.streak ?? 0) > 0 && (
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-stone-300">
+                  racha {currentCase.streak}
+                </span>
+              )}
+            </button>
+          )}
+          <span className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
+            {stageLabels[state]}
+          </span>
+        </div>
       </div>
 
       <div
@@ -90,8 +136,8 @@ export default function TrainerCard({
               {totalCases === 0
                 ? 'Importa algoritmos y memos para activar la practica.'
                 : algorithmStep
-                  ? 'Usa espacio para avanzar rapido entre memo, algoritmo y siguiente caso.'
-                  : 'Usa espacio para avanzar rapido entre par, memo y siguiente caso.'}
+                  ? 'Usa espacio para avanzar rapido entre memo, algoritmo y evaluacion.'
+                  : 'Usa espacio para avanzar rapido entre par, memo y evaluacion.'}
             </p>
           </div>
         ) : (
@@ -131,29 +177,49 @@ export default function TrainerCard({
       </div>
 
       <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row">
-        <button
-          type="button"
-          onClick={onAdvance}
-          disabled={!canStart}
-          className={[
-            'inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-            canStart
-              ? 'bg-cyan-200 text-stone-950 hover:bg-cyan-100 active:bg-cyan-300'
-              : 'cursor-not-allowed bg-white/[0.06] text-stone-500',
-          ].join(' ')}
-          aria-label={primaryButtonLabel(state, algorithmStep)}
-        >
-          {primaryButtonLabel(state, algorithmStep)}
-        </button>
-
-        {algorithmStep && state === 3 && (
+        {showRating ? (
+          <>
+            <button
+              type="button"
+              onClick={onRateGood}
+              className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-stone-950 transition hover:bg-emerald-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+              aria-label="Bien — recuerdo correcto"
+            >
+              Bien
+            </button>
+            <button
+              type="button"
+              onClick={onRateBad}
+              className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-red-300/40 bg-red-400/15 px-5 text-sm font-semibold text-red-100 transition hover:bg-red-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+              aria-label="Mal — olvide memo o algoritmo"
+            >
+              Mal
+            </button>
+            {algorithmStep && (
+              <button
+                type="button"
+                onClick={onReset}
+                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-stone-100 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:flex-none"
+                aria-label="Repetir caso"
+              >
+                Repetir (R)
+              </button>
+            )}
+          </>
+        ) : (
           <button
             type="button"
-            onClick={onReset}
-            className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-stone-100 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-            aria-label="Repetir caso"
+            onClick={onAdvance}
+            disabled={!canStart}
+            className={[
+              'inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+              canStart
+                ? 'bg-cyan-200 text-stone-950 hover:bg-cyan-100 active:bg-cyan-300'
+                : 'cursor-not-allowed bg-white/[0.06] text-stone-500',
+            ].join(' ')}
+            aria-label={primaryButtonLabel(state, algorithmStep)}
           >
-            Repetir caso (R)
+            {primaryButtonLabel(state, algorithmStep)}
           </button>
         )}
       </div>

@@ -1,6 +1,6 @@
 # Data Model
 
-Last updated: 2026-06-22
+Last updated: 2026-07-05
 
 ## Domain Types
 
@@ -21,6 +21,8 @@ interface TrainingCase {
   memo: string
   algoritmo: string
   algoritmos?: string[]
+  isLearned?: boolean
+  streak?: number
 }
 ```
 
@@ -31,8 +33,13 @@ Field meaning:
 - `memo`: memo word/image for the pair.
 - `algoritmo`: original 3-style algorithm cell text.
 - `algoritmos`: optional cleaned variants split from multiline algorithm cells.
+- `isLearned`: whether the user marked the case as learned. Learned cases enter
+  spaced-repetition rotation instead of always appearing every round.
+- `streak`: consecutive successful recalls, `0`–`5`. Drives inclusion probability
+  for learned cases.
 
 Legacy stored cases without `tipo` are normalized to `arista` at read time.
+Missing progress fields normalize to `isLearned: false` and `streak: 0`.
 
 ## CSV Matrix Format
 
@@ -179,7 +186,44 @@ Public helpers:
 - `caseKey`
 
 `mergeCasesByType` replaces only the imported piece type and keeps the other
-type's cases intact.
+type's cases intact. When re-importing a piece type, existing `isLearned` and
+`streak` values are preserved per stable case key (`tipo:par`).
+
+## Spaced repetition
+
+Files:
+
+```text
+app/lib/session-pool.ts
+app/lib/case-progress.ts
+```
+
+### Session pool
+
+Before shuffled or sequential selection, `buildSessionPool()` builds the active
+practice pool:
+
+- Unlearned cases (`isLearned === false`) are always included.
+- Learned cases pass a random inclusion check based on current `streak`:
+  - `streak <= 1`: 80% inclusion (newly learned, frequent review).
+  - `streak === 2` or `3`: 50% inclusion (stabilizing).
+  - `streak >= 4`: 20% inclusion (muscle memory, sporadic review).
+- Fail-safe: if every learned case is filtered out, the lowest-streak learned
+  case is forced in (or the first available case when all are learned).
+
+`useCaseSelection` applies this filter before the existing shuffled-list
+selection logic.
+
+### Case progress mutations
+
+`applyCaseRating(trainingCase, rating)`:
+
+- `'good'`: increment `streak` by 1, capped at `5`.
+- `'bad'`: reset `streak` to `0`.
+
+`toggleCaseLearned(trainingCase)` flips `isLearned`.
+
+Ratings are persisted through `updateCaseInArray()` into `bld-trainer-cases`.
 
 ## Persistence
 

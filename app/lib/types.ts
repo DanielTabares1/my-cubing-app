@@ -21,6 +21,10 @@ export interface TrainingCase {
   algoritmo: string;
   /** Algorithm variants split from multiline cells. First item mirrors the primary display variant. */
   algoritmos?: string[];
+  /** Whether the user has marked this case as learned. Learned cases enter spaced-repetition rotation. */
+  isLearned?: boolean;
+  /** Consecutive successful recalls (0–5). Drives inclusion probability for learned cases. */
+  streak?: number;
 }
 
 // ---------------------------------------------------------------------------
