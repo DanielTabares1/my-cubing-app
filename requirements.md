@@ -1,6 +1,6 @@
 # Product Requirements: My Cubing Tool MVP
 
-Last updated: 2026-06-22
+Last updated: 2026-07-05
 
 ## Product Direction
 
@@ -104,8 +104,13 @@ interface TrainingCase {
   memo: string
   algoritmo: string
   algoritmos?: string[]
+  isLearned?: boolean
+  streak?: number
 }
 ```
+
+Progress fields default to `isLearned: false` and `streak: 0`. Re-importing one
+piece type preserves existing progress for matching case keys.
 
 ### Import UI
 
@@ -156,13 +161,13 @@ Trainer states:
 Default flow:
 
 ```text
-Idle -> Pair -> Memo -> Algorithm -> Next Pair
+Idle -> Pair -> Memo -> Algorithm -> Rate -> Next Pair
 ```
 
 Solo memo flow:
 
 ```text
-Idle -> Pair -> Memo -> Next Pair
+Idle -> Pair -> Memo -> Rate -> Next Pair
 ```
 
 Requirements:
@@ -178,6 +183,48 @@ Requirements:
 - Timer displays `0.00` until a case is active.
 - Switching piece type or changing the active case pool resets the session to
   idle.
+
+## Spaced Repetition
+
+The trainer weights case selection so learned algorithms stay in rotation for
+long-term retention without dominating daily practice.
+
+### Learned flag
+
+- Each case can be marked **Aprendido** or **Por aprender** from the trainer
+  card header.
+- Learned cases enter spaced-repetition rotation; unlearned cases always appear
+  in the session pool.
+
+### Session pool
+
+Before random or sequential selection, build a session pool:
+
+- Unlearned cases: 100% inclusion.
+- Learned cases: probabilistic inclusion by current `streak`:
+  - `streak <= 1`: 80%
+  - `streak === 2` or `3`: 50%
+  - `streak >= 4`: 20%
+- If random filtering would leave the pool empty, force in the lowest-streak
+  learned case (or the first available case when all are learned).
+
+### Post-case rating
+
+After the final reveal step (algorithm in full mode, memo in solo memo mode),
+replace the primary advance button with:
+
+- **Bien**: successful recall — increment `streak` by 1, capped at 5, then
+  advance to the next case.
+- **Mal**: failed recall — reset `streak` to 0, then advance.
+
+During the rating stage, disable keyboard shortcuts so `Space` cannot skip
+evaluation.
+
+Ratings and the learned flag persist in `bld-trainer-cases`.
+
+### Search UI
+
+Learned cases in sidebar search results show an `OK` badge.
 
 ## Case Search
 

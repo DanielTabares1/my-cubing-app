@@ -1,6 +1,6 @@
 # Handoff Notes
 
-Last updated: 2026-06-22
+Last updated: 2026-07-05
 
 ## Current State
 
@@ -26,6 +26,9 @@ Completed:
 - Timer reset behavior handles regular next-case flow and search selection.
 - Hydration-safe `useLocalStorage` via `useSyncExternalStore`.
 - Trainer card layout anchored near the top (no vertical centering scroll trap).
+- Spaced-repetition filter for learned cases with streak-based inclusion rates.
+- Post-case rating (`Bien` / `Mal`) and learned toggle on the trainer card.
+- Case search shows an `OK` badge for learned cases.
 
 ## Current Known Issues
 
@@ -37,6 +40,24 @@ Completed:
 - `CLAUDE.md` only points to `AGENTS.md`.
 
 ## Recent Important Changes
+
+### Spaced Repetition
+
+- `TrainingCase` now includes optional `isLearned` and `streak` (0–5).
+- Unlearned cases always enter the session pool; learned cases are included
+  probabilistically by streak (80% / 50% / 20%).
+- `buildSessionPool()` in `app/lib/session-pool.ts` applies the filter with a
+  fail-safe so the pool never ends up empty.
+- `useCaseSelection` builds a new session pool before each shuffle round.
+- After memo (solo memo mode) or algorithm reveal, the user rates the attempt
+  with **Bien** or **Mal**; ratings update `streak` and persist to
+  `localStorage`.
+- The trainer card header toggles **Aprendido** / **Por aprender** and shows
+  the current streak when greater than zero.
+- Re-importing a piece type preserves progress per case key via
+  `mergeCasesByType`.
+- Tests: `app/lib/__tests__/session-pool.test.ts`,
+  `app/lib/__tests__/case-progress.test.ts`.
 
 ### Edges And Corners
 
@@ -102,7 +123,7 @@ High value:
 - Add tests for:
   - `practicePiece` filtering,
   - collapsible import panel behavior,
-  - `mergeCasesByType`.
+  - `mergeCasesByType` progress preservation.
 - Split `CaseSearch`, `Metric`, and `PracticePieceToggle` out of
   `app/trainer/page.tsx` if the page grows further.
 
@@ -110,7 +131,7 @@ Medium value:
 
 - Show skipped-cell count in import summary.
 - Exact-match prioritization in search for long result lists.
-- Case subsets or custom practice filters.
+- Case subsets or custom practice filters (beyond learned / unlearned weighting).
 
 Avoid unless explicitly requested:
 

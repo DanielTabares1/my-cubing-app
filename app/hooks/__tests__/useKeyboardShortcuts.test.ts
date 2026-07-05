@@ -138,6 +138,26 @@ describe('useKeyboardShortcuts', () => {
     expect(onReset).not.toHaveBeenCalled();
   });
 
+  it('does NOT call onReset when resetEnabled is false', () => {
+    renderHook(() =>
+      useKeyboardShortcuts({ onAdvance, onReset, enabled: true, resetEnabled: false }),
+    );
+
+    fireKeyDown('r');
+    fireKeyDown('R');
+    expect(onReset).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call onAdvance when Space target is a <button>', () => {
+    renderHook(() =>
+      useKeyboardShortcuts({ onAdvance, onReset, enabled: true }),
+    );
+
+    const button = document.createElement('button');
+    fireKeyDown(' ', button);
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
+
   // -------------------------------------------------------------------------
   // Cleanup on unmount
   // -------------------------------------------------------------------------

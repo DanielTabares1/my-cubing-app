@@ -19,12 +19,14 @@ product entry point.
 - Practice edges or corners with a header toggle (`Aristas` / `Esquinas`).
 - Separate sidebar counts for edges, corners, and total cases.
 - Flashcard flow:
-  - `Idle -> Pair recognition -> Memo -> Algorithm -> Next case`
+  - `Idle -> Pair recognition -> Memo -> Algorithm -> Rate (Bien/Mal) -> Next case`
   - Optional `Solo memo` mode:
-    `Idle -> Pair recognition -> Memo -> Next case`
+    `Idle -> Pair recognition -> Memo -> Rate (Bien/Mal) -> Next case`
 - Search cases by letter pair within the active piece type.
 - Jump directly to a searched case.
-- Random or sequential case selection.
+- Random or sequential case selection with spaced-repetition weighting for learned cases.
+- Mark cases as learned (`Aprendido` / `Por aprender`) and rate each attempt (`Bien` / `Mal`).
+- Streak-based review: learned cases appear less often as recall improves; a failed rating resets the streak.
 - Visual timer that resets on each new case.
 - Keyboard shortcuts:
   - `Space`: advance the current practice step.
@@ -116,8 +118,14 @@ interface TrainingCase {
   memo: string
   algoritmo: string
   algoritmos?: string[]
+  isLearned?: boolean
+  streak?: number
 }
 ```
+
+Progress fields default to `isLearned: false` and `streak: 0`. They persist in
+`localStorage` with the case and survive piece-type re-imports when the pair
+key matches.
 
 Example edge case:
 
@@ -154,6 +162,8 @@ Use them as upload templates. They are sparse but structurally valid.
 - `app/lib/csv-parser.ts`: PapaParse wrapper and matrix validation.
 - `app/lib/matrix-transformer.ts`: matrix-to-cases transformation.
 - `app/lib/training-cases.ts`: merge, filter, and count helpers.
+- `app/lib/session-pool.ts`: spaced-repetition session pool builder.
+- `app/lib/case-progress.ts`: learned toggle and post-case rating mutations.
 - `app/lib/types.ts`: shared domain types.
 
 More detailed notes live in `docs/`.

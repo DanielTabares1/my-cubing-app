@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PieceType, TrainingCase, UserPreferences } from '@/app/lib/types'
 import { StorageManager } from '@/app/lib/storage-manager'
 import { caseKey, countCasesByType, filterCasesByPiece, normalizeTrainingCases } from '@/app/lib/training-cases'
+import { applyCaseRating, toggleCaseLearned, updateCaseInArray } from '@/app/lib/case-progress'
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
 import { useTrainerState } from '@/app/hooks/useTrainerState'
 import { useKeyboardShortcuts } from '@/app/hooks/useKeyboardShortcuts'
@@ -46,6 +47,17 @@ export default function TrainerPage() {
     practicePiece,
   )
 
+  const displayCase = useMemo(() => {
+    if (!currentCase) return null
+    return (
+      practiceCases.find((trainingCase) => caseKey(trainingCase) === caseKey(currentCase)) ??
+      currentCase
+    )
+  }, [currentCase, practiceCases])
+
+  const atRatingStage =
+    displayCase !== null && (algorithmStep ? state === 3 : state === 2)
+
   const prevStateRef = useRef(state)
   const prevCaseRef = useRef<string | null>(null)
   const [timerResetToken, setTimerResetToken] = useState(false)
@@ -62,11 +74,34 @@ export default function TrainerPage() {
     prevCaseRef.current = currentPar
   }, [state, currentCase])
 
+  const persistCaseUpdate = useCallback(
+    (updater: (trainingCase: TrainingCase) => TrainingCase) => {
+      if (!displayCase) return
+      setCases((prev) => updateCaseInArray(prev, caseKey(displayCase), updater))
+    },
+    [displayCase, setCases],
+  )
+
+  const handleRateGood = useCallback(() => {
+    persistCaseUpdate((trainingCase) => applyCaseRating(trainingCase, 'good'))
+    advance()
+  }, [persistCaseUpdate, advance])
+
+  const handleRateBad = useCallback(() => {
+    persistCaseUpdate((trainingCase) => applyCaseRating(trainingCase, 'bad'))
+    advance()
+  }, [persistCaseUpdate, advance])
+
   useKeyboardShortcuts({
-    onAdvance: advance,
+    onAdvance: atRatingStage ? handleRateGood : advance,
     onReset: reset,
     enabled: state > 0,
+    resetEnabled: !atRatingStage || algorithmStep,
   })
+
+  const handleToggleLearned = useCallback(() => {
+    persistCaseUpdate(toggleCaseLearned)
+  }, [persistCaseUpdate])
 
   const handleImportComplete = useCallback(
     (newCases: TrainingCase[]) => {
@@ -277,9 +312,12 @@ export default function TrainerPage() {
           <section className="flex min-w-0 self-start justify-center rounded-xl border border-white/10 bg-[radial-gradient(circle_at_30%_20%,rgba(103,232,249,0.08),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015))] p-3 sm:p-6">
             <TrainerCard
               state={state}
-              currentCase={currentCase}
+              currentCase={displayCase}
               onAdvance={state === 0 ? startPractice : advance}
               onReset={reset}
+              onRateGood={handleRateGood}
+              onRateBad={handleRateBad}
+              onToggleLearned={handleToggleLearned}
               totalCases={practiceCases.length}
               algorithmStep={algorithmStep}
             />
@@ -450,6 +488,11 @@ function CaseSearch({
               <span className="min-w-0 truncate text-sm text-stone-400">
                 {trainingCase.memo}
               </span>
+              {trainingCase.isLearned && (
+                <span className="shrink-0 rounded-full bg-emerald-300/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                  OK
+                </span>
+              )}
             </button>
           )
         })}

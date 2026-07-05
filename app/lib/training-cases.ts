@@ -4,6 +4,8 @@ export function normalizeTrainingCase(trainingCase: TrainingCase): TrainingCase 
   return {
     ...trainingCase,
     tipo: trainingCase.tipo ?? 'arista',
+    isLearned: trainingCase.isLearned ?? false,
+    streak: trainingCase.streak ?? 0,
   };
 }
 
@@ -16,8 +18,26 @@ export function mergeCasesByType(
   imported: TrainingCase[],
   tipo: PieceType,
 ): TrainingCase[] {
-  const kept = normalizeTrainingCases(existing).filter((trainingCase) => trainingCase.tipo !== tipo);
-  return [...kept, ...imported];
+  const normalizedExisting = normalizeTrainingCases(existing);
+  const progressByKey = new Map(
+    normalizedExisting
+      .filter((trainingCase) => trainingCase.tipo === tipo)
+      .map((trainingCase) => [
+        caseKey(trainingCase),
+        { isLearned: trainingCase.isLearned, streak: trainingCase.streak },
+      ]),
+  );
+  const kept = normalizedExisting.filter((trainingCase) => trainingCase.tipo !== tipo);
+  const merged = imported.map((trainingCase) => {
+    const progress = progressByKey.get(caseKey(normalizeTrainingCase(trainingCase)));
+    if (!progress) return normalizeTrainingCase(trainingCase);
+    return normalizeTrainingCase({
+      ...trainingCase,
+      isLearned: progress.isLearned,
+      streak: progress.streak,
+    });
+  });
+  return [...kept, ...merged];
 }
 
 export function countCasesByType(cases: TrainingCase[]) {

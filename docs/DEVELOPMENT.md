@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-06-22
+Last updated: 2026-07-05
 
 ## Commands
 
@@ -114,8 +114,10 @@ Do not make `/` redirect to the new tool.
 Start with:
 
 - `app/hooks/useTrainerState.ts` for flow changes.
-- `app/trainer/page.tsx` for page wiring.
-- `app/components/TrainerCard.tsx` for visual state.
+- `app/trainer/page.tsx` for page wiring and rating persistence.
+- `app/components/TrainerCard.tsx` for visual state, learned toggle, and rating buttons.
+- `app/hooks/useCaseSelection.ts` for session pool integration.
+- `app/lib/session-pool.ts` and `app/lib/case-progress.ts` for spaced-repetition logic.
 - `app/hooks/__tests__/useTrainerState.test.ts` for state machine tests.
 
 If changing CSV behavior:
@@ -146,3 +148,5 @@ After UI changes:
     `examples/sample-algorithms-corners.csv`.
 14. Search a pair and select it.
 15. Toggle timer visibility and reload to confirm no hydration error.
+16. Mark a case as **Aprendido**, complete a round, and rate with **Bien** or **Mal**.
+17. Confirm learned cases appear less often in random mode and search shows the `OK` badge.

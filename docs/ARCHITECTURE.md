@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-06-22
+Last updated: 2026-07-05
 
 ## Overview
 
@@ -42,7 +42,12 @@ The page is also responsible for:
 - Timer reset token.
 - Error banner.
 - Header controls.
-- Passing the correct advance handler to `TrainerCard`.
+- Post-case rating handlers (`Bien` / `Mal`) that update `streak` and persist.
+- Learned-toggle handler that flips `isLearned`.
+
+`TrainerCard` shows a rating stage after the final reveal step (memo in solo
+memo mode, algorithm in full mode). During rating, keyboard shortcuts are
+disabled so `Space` does not skip evaluation.
 
 ## Sidebar Behavior
 
@@ -106,7 +111,23 @@ The hook resets to idle when `practicePiece` or the filtered case count changes.
 
 ### `useCaseSelection`
 
-Selects next case randomly or sequentially.
+Selects next case randomly or sequentially from a spaced-repetition session pool.
+
+- Calls `buildSessionPool()` before shuffling or cycling.
+- `'random'`: shuffled playlist over the current pool; no repeats until every
+  pool case has been shown once, then a new pool and shuffle start.
+- `'sequential'`: returns cases in session-pool order, cycling from the start.
+- `notifyCasePracticed()` removes a manually chosen case from the remaining
+  shuffled round.
+
+### Spaced repetition modules
+
+```text
+app/lib/session-pool.ts   buildSessionPool, getLearnedInclusionProbability
+app/lib/case-progress.ts  applyCaseRating, toggleCaseLearned, updateCaseInArray
+```
+
+See `docs/DATA_MODEL.md` for inclusion probabilities and streak rules.
 
 ### `useKeyboardShortcuts`
 
@@ -129,6 +150,8 @@ Memo CSV + optional edge/corner algo CSVs
   -> TrainingCase[]
   -> localStorage + React state
   -> filterCasesByPiece(practicePiece)
+  -> buildSessionPool (spaced repetition)
+  -> useCaseSelection (shuffle / sequential)
   -> TrainerCard / CaseSearch
 ```
 
