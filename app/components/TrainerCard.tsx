@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { TrainerState, TrainingCase } from '@/app/lib/types'
 import { splitAlgorithmVariants } from '@/app/lib/algorithm-variants'
 import CaseCountBadge from './CaseCountBadge'
@@ -57,9 +58,16 @@ export default function TrainerCard({
   const canStart = state !== 0 || totalCases > 0
   const showLearnedToggle = state >= 1 && currentCase !== null
   const showRating = isRatingStage(state, algorithmStep) && currentCase !== null
+  const goodButtonRef = useRef<HTMLButtonElement>(null)
   const algorithmVariants = currentCase
     ? currentCase.algoritmos ?? splitAlgorithmVariants(currentCase.algoritmo)
     : []
+
+  useEffect(() => {
+    if (showRating) {
+      goodButtonRef.current?.focus()
+    }
+  }, [showRating, currentCase?.par])
 
   return (
     <div
@@ -136,8 +144,8 @@ export default function TrainerCard({
               {totalCases === 0
                 ? 'Importa algoritmos y memos para activar la practica.'
                 : algorithmStep
-                  ? 'Usa espacio para avanzar rapido entre memo, algoritmo y evaluacion.'
-                  : 'Usa espacio para avanzar rapido entre par, memo y evaluacion.'}
+                  ? 'Usa espacio para avanzar rapido. En evaluacion, espacio confirma Bien.'
+                  : 'Usa espacio para avanzar rapido. En evaluacion, espacio confirma Bien.'}
             </p>
           </div>
         ) : (
@@ -180,16 +188,21 @@ export default function TrainerCard({
         {showRating ? (
           <>
             <button
+              ref={goodButtonRef}
               type="button"
               onClick={onRateGood}
-              className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-stone-950 transition hover:bg-emerald-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-stone-950 ring-2 ring-emerald-100 ring-offset-2 ring-offset-stone-950 transition hover:bg-emerald-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
               aria-label="Bien — recuerdo correcto"
             >
               Bien
+              <span className="text-xs font-medium uppercase tracking-wide text-stone-700/80">
+                (Space)
+              </span>
             </button>
             <button
               type="button"
               onClick={onRateBad}
+              tabIndex={-1}
               className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-red-300/40 bg-red-400/15 px-5 text-sm font-semibold text-red-100 transition hover:bg-red-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
               aria-label="Mal — olvide memo o algoritmo"
             >

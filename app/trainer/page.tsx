@@ -74,12 +74,6 @@ export default function TrainerPage() {
     prevCaseRef.current = currentPar
   }, [state, currentCase])
 
-  useKeyboardShortcuts({
-    onAdvance: advance,
-    onReset: reset,
-    enabled: state > 0 && !atRatingStage,
-  })
-
   const persistCaseUpdate = useCallback(
     (updater: (trainingCase: TrainingCase) => TrainingCase) => {
       if (!displayCase) return
@@ -97,6 +91,13 @@ export default function TrainerPage() {
     persistCaseUpdate((trainingCase) => applyCaseRating(trainingCase, 'bad'))
     advance()
   }, [persistCaseUpdate, advance])
+
+  useKeyboardShortcuts({
+    onAdvance: atRatingStage ? handleRateGood : advance,
+    onReset: reset,
+    enabled: state > 0,
+    resetEnabled: !atRatingStage || algorithmStep,
+  })
 
   const handleToggleLearned = useCallback(() => {
     persistCaseUpdate(toggleCaseLearned)

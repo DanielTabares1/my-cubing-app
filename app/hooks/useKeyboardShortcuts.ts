@@ -26,6 +26,8 @@ interface UseKeyboardShortcutsOptions {
   onReset: () => void;
   /** When false the listener is not attached (and any existing one is removed). */
   enabled: boolean;
+  /** When false, R does not trigger onReset. Defaults to true. */
+  resetEnabled?: boolean;
 }
 
 /**
@@ -39,6 +41,7 @@ export function useKeyboardShortcuts({
   onAdvance,
   onReset,
   enabled,
+  resetEnabled = true,
 }: UseKeyboardShortcutsOptions): void {
   useEffect(() => {
     // Guard: SSR safety (window may not exist during server rendering)
@@ -48,10 +51,11 @@ export function useKeyboardShortcuts({
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Skip when the user is typing into a text field
+      // Skip when the user is typing or activating a focused control
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLButtonElement
       ) {
         return;
       }
@@ -59,7 +63,7 @@ export function useKeyboardShortcuts({
       if (e.key === ' ') {
         e.preventDefault();
         onAdvance();
-      } else if (e.key === 'r' || e.key === 'R') {
+      } else if (resetEnabled && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
         onReset();
       }
@@ -71,5 +75,5 @@ export function useKeyboardShortcuts({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onAdvance, onReset, enabled]);
+  }, [onAdvance, onReset, enabled, resetEnabled]);
 }
