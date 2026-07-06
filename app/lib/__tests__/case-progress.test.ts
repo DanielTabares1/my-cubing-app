@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCaseRating, toggleCaseLearned } from '../case-progress';
+import {
+  applyCaseRating,
+  getCaseProgressBadge,
+  isFullyLearned,
+  toggleCaseLearned,
+} from '../case-progress';
 import { MAX_STREAK } from '../session-pool';
 import type { TrainingCase } from '../types';
 
@@ -22,20 +27,56 @@ describe('applyCaseRating', () => {
     expect(rated.streak).toBe(5);
   });
 
-  it('does not exceed MAX_STREAK on good rating', () => {
-    const rated = applyCaseRating(makeCase({ streak: MAX_STREAK }), 'good');
+  it('auto-learns when a good rating reaches MAX_STREAK', () => {
+    const rated = applyCaseRating(makeCase({ streak: 4, isLearned: false }), 'good');
     expect(rated.streak).toBe(MAX_STREAK);
+    expect(rated.isLearned).toBe(true);
   });
 
-  it('resets streak to 0 on bad rating', () => {
+  it('does not exceed MAX_STREAK on good rating', () => {
+    const rated = applyCaseRating(makeCase({ streak: MAX_STREAK, isLearned: true }), 'good');
+    expect(rated.streak).toBe(MAX_STREAK);
+    expect(rated.isLearned).toBe(true);
+  });
+
+  it('resets streak and unlearns on bad rating for a learned case', () => {
     const rated = applyCaseRating(makeCase({ streak: 4, isLearned: true }), 'bad');
     expect(rated.streak).toBe(0);
+    expect(rated.isLearned).toBe(false);
+  });
+
+  it('resets streak on bad rating without changing an unlearned case', () => {
+    const rated = applyCaseRating(makeCase({ streak: 3, isLearned: false }), 'bad');
+    expect(rated.streak).toBe(0);
+    expect(rated.isLearned).toBe(false);
   });
 });
 
 describe('toggleCaseLearned', () => {
-  it('flips the learned flag', () => {
-    expect(toggleCaseLearned(makeCase({ isLearned: false })).isLearned).toBe(true);
-    expect(toggleCaseLearned(makeCase({ isLearned: true })).isLearned).toBe(false);
+  it('marks learned with max streak', () => {
+    const toggled = toggleCaseLearned(makeCase({ isLearned: false, streak: 2 }));
+    expect(toggled.isLearned).toBe(true);
+    expect(toggled.streak).toBe(MAX_STREAK);
+  });
+
+  it('unmarks learned and resets streak', () => {
+    const toggled = toggleCaseLearned(makeCase({ isLearned: true, streak: MAX_STREAK }));
+    expect(toggled.isLearned).toBe(false);
+    expect(toggled.streak).toBe(0);
+  });
+});
+
+describe('progress badge helpers', () => {
+  it('shows Learned instead of racha 5 for full mastery', () => {
+    expect(getCaseProgressBadge(makeCase({ isLearned: true, streak: MAX_STREAK }))).toBe('Learned');
+  });
+
+  it('shows racha for in-progress streaks', () => {
+    expect(getCaseProgressBadge(makeCase({ streak: 3 }))).toBe('racha 3');
+  });
+
+  it('detects full mastery', () => {
+    expect(isFullyLearned(makeCase({ isLearned: true, streak: MAX_STREAK }))).toBe(true);
+    expect(isFullyLearned(makeCase({ isLearned: true, streak: 4 }))).toBe(false);
   });
 });
