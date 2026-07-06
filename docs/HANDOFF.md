@@ -1,6 +1,6 @@
 # Handoff Notes
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Current State
 
@@ -29,6 +29,9 @@ Completed:
 - Spaced-repetition filter for learned cases with streak-based inclusion rates.
 - Post-case rating (`Bien` / `Mal`) and learned toggle on the trainer card.
 - Case search shows an `OK` badge for learned cases.
+- Round progress UI on the trainer card (`RoundProgress`) with nuevos/repaso counts.
+- Sidebar mastery metrics for the active piece type (`Aprendidos`, `Por aprender`).
+- `Space` confirms **Bien** at the rating stage; **Mal** requires a click.
 
 ## Current Known Issues
 
@@ -40,6 +43,26 @@ Completed:
 - `CLAUDE.md` only points to `AGENTS.md`.
 
 ## Recent Important Changes
+
+### Round Progress
+
+- `app/lib/round-stats.ts` defines `CatalogStats` and `RoundStats`.
+- `useCaseSelection` exposes `catalogStats` (whole practice set) and `roundStats`
+  (current shuffle round).
+- A round is the fixed session pool for one shuffled playlist cycle in random
+  mode (or one pool cycle in sequential mode).
+- `RoundProgress` on the trainer card shows `Ronda X/Y`, nuevos/repaso pills,
+  percentage, and a progress bar while practicing.
+- Sidebar **Estado** shows `Aprendidos` and `Por aprender` for the active piece
+  type.
+- Tests: `app/lib/__tests__/round-stats.test.ts`, round coverage in
+  `useCaseSelection` tests.
+
+### Rating UX
+
+- **Bien** is auto-focused when the rating stage opens.
+- `Space` confirms **Bien** for fast flow-through practice.
+- **Mal** is click-only (`tabIndex={-1}`) to avoid accidental failures.
 
 ### Spaced Repetition
 

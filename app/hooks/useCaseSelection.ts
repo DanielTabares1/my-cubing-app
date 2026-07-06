@@ -1,15 +1,10 @@
-/**
- * useCaseSelection — hook for selecting training cases from an array.
- * Applies spaced-repetition session pool filtering before shuffled selection.
- * Requirements: 8.1, 8.2, 8.3, 8.4
- */
-
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { TrainingCase, UseCaseSelectionReturn } from '../lib/types';
 import { caseKey } from '../lib/training-cases';
 import { buildSessionPool } from '../lib/session-pool';
+import { getCatalogStats, getRoundStats, type RoundStats } from '../lib/round-stats';
 import {
   createShuffledQueue,
   removeIndexFromQueue,
@@ -28,24 +23,57 @@ function casesPoolKey(cases: TrainingCase[]): string {
  *                     new pool and shuffle start.
  *  - `'sequential'` : Returns cases in session-pool order, cycling from the start.
  */
-export function useCaseSelection(cases: TrainingCase[]): UseCaseSelectionReturn {
+export function useCaseSelection(
+  cases: TrainingCase[],
+  selectionMode: 'random' | 'sequential' = 'random',
+): UseCaseSelectionReturn {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [roundStats, setRoundStats] = useState<RoundStats | null>(null);
   const shuffleQueueRef = useRef<number[]>([]);
   const sessionPoolRef = useRef<TrainingCase[]>([]);
   const excludedKeysRef = useRef<Set<string>>(new Set());
   const poolKeyRef = useRef('');
+  const roundSizeRef = useRef(0);
+  const completedInRoundRef = useRef(0);
+
+  const catalogStats = useMemo(() => getCatalogStats(cases), [cases]);
+
+  const syncRoundStats = useCallback(() => {
+    const nextStats = getRoundStats(
+      sessionPoolRef.current,
+      roundSizeRef.current,
+      completedInRoundRef.current,
+    );
+    setRoundStats(nextStats);
+  }, []);
+
+  const beginRound = useCallback(
+    (pool: TrainingCase[]) => {
+      sessionPoolRef.current = pool;
+      roundSizeRef.current = pool.length;
+      completedInRoundRef.current = 0;
+      syncRoundStats();
+    },
+    [syncRoundStats],
+  );
 
   const refreshSessionPool = useCallback(() => {
-    sessionPoolRef.current = buildSessionPool(cases);
-    return sessionPoolRef.current;
+    const pool = buildSessionPool(cases);
+    return pool;
   }, [cases]);
 
   const initializeShuffleQueue = useCallback(() => {
     const pool = refreshSessionPool();
     if (pool.length === 0) {
       shuffleQueueRef.current = [];
+      roundSizeRef.current = 0;
+      completedInRoundRef.current = 0;
+      sessionPoolRef.current = [];
+      setRoundStats(null);
       return pool;
     }
+
+    beginRound(pool);
 
     const excluded = excludedKeysRef.current;
     const shuffled = createShuffledQueue(pool.length).filter(
@@ -54,7 +82,15 @@ export function useCaseSelection(cases: TrainingCase[]): UseCaseSelectionReturn 
     shuffleQueueRef.current = shuffled.length > 0 ? shuffled : createShuffledQueue(pool.length);
     excludedKeysRef.current = new Set();
     return pool;
-  }, [refreshSessionPool]);
+  }, [beginRound, refreshSessionPool]);
+
+  const markCaseCompleted = useCallback(() => {
+    completedInRoundRef.current = Math.min(
+      roundSizeRef.current,
+      completedInRoundRef.current + 1,
+    );
+    syncRoundStats();
+  }, [syncRoundStats]);
 
   useEffect(() => {
     const nextKey = casesPoolKey(cases);
@@ -63,7 +99,10 @@ export function useCaseSelection(cases: TrainingCase[]): UseCaseSelectionReturn 
       shuffleQueueRef.current = [];
       sessionPoolRef.current = [];
       excludedKeysRef.current = new Set();
+      roundSizeRef.current = 0;
+      completedInRoundRef.current = 0;
       setCurrentIndex(0);
+      setRoundStats(null);
     }
   }, [cases]);
 
@@ -81,44 +120,76 @@ export function useCaseSelection(cases: TrainingCase[]): UseCaseSelectionReturn 
 
         const index = shuffleQueueRef.current.pop();
         if (index === undefined) return null;
+
+        completedInRoundRef.current = roundSizeRef.current - shuffleQueueRef.current.length;
+        syncRoundStats();
         return pool[index] ?? null;
       }
 
       let pool = sessionPoolRef.current;
       if (pool.length === 0) {
         pool = refreshSessionPool();
+        if (pool.length === 0) return null;
+        beginRound(pool);
       }
-      if (pool.length === 0) return null;
 
       const selected = pool[currentIndex % pool.length];
-      setCurrentIndex((prev) => {
-        const next = prev + 1;
-        if (next >= pool.length) {
-          refreshSessionPool();
-          return 0;
+      const nextIndex = currentIndex + 1;
+
+      if (nextIndex >= pool.length) {
+        completedInRoundRef.current = pool.length;
+        syncRoundStats();
+
+        const nextPool = refreshSessionPool();
+        if (nextPool.length === 0) {
+          setCurrentIndex(0);
+          return selected;
         }
-        return next;
-      });
+
+        beginRound(nextPool);
+        setCurrentIndex(0);
+        return selected;
+      }
+
+      completedInRoundRef.current = nextIndex;
+      syncRoundStats();
+      setCurrentIndex(nextIndex);
       return selected;
     },
-    [cases.length, currentIndex, initializeShuffleQueue, refreshSessionPool],
+    [
+      cases.length,
+      currentIndex,
+      beginRound,
+      initializeShuffleQueue,
+      refreshSessionPool,
+      syncRoundStats,
+    ],
   );
 
   const notifyCasePracticed = useCallback(
     (trainingCase: TrainingCase) => {
       const key = caseKey(trainingCase);
 
-      if (shuffleQueueRef.current.length === 0) {
-        excludedKeysRef.current.add(key);
+      if (selectionMode === 'random') {
+        if (shuffleQueueRef.current.length === 0) {
+          excludedKeysRef.current.add(key);
+          return;
+        }
+
+        const pool =
+          sessionPoolRef.current.length > 0 ? sessionPoolRef.current : refreshSessionPool();
+        const index = pool.findIndex((candidate) => caseKey(candidate) === key);
+        removeIndexFromQueue(shuffleQueueRef.current, index);
+        completedInRoundRef.current = roundSizeRef.current - shuffleQueueRef.current.length;
+        syncRoundStats();
         return;
       }
 
-      const pool =
-        sessionPoolRef.current.length > 0 ? sessionPoolRef.current : refreshSessionPool();
-      const index = pool.findIndex((candidate) => caseKey(candidate) === key);
-      removeIndexFromQueue(shuffleQueueRef.current, index);
+      if (roundSizeRef.current > 0) {
+        markCaseCompleted();
+      }
     },
-    [refreshSessionPool],
+    [markCaseCompleted, refreshSessionPool, selectionMode, syncRoundStats],
   );
 
   return {
@@ -126,5 +197,7 @@ export function useCaseSelection(cases: TrainingCase[]): UseCaseSelectionReturn 
     notifyCasePracticed,
     hasMoreCases: cases.length > 0,
     currentIndex,
+    catalogStats,
+    roundStats,
   };
 }

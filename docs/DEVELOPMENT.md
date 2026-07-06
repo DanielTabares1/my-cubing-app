@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Commands
 
@@ -115,9 +115,10 @@ Start with:
 
 - `app/hooks/useTrainerState.ts` for flow changes.
 - `app/trainer/page.tsx` for page wiring and rating persistence.
-- `app/components/TrainerCard.tsx` for visual state, learned toggle, and rating buttons.
-- `app/hooks/useCaseSelection.ts` for session pool integration.
-- `app/lib/session-pool.ts` and `app/lib/case-progress.ts` for spaced-repetition logic.
+- `app/components/TrainerCard.tsx` for visual state, learned toggle, rating buttons, and round progress.
+- `app/components/RoundProgress.tsx` for the round progress strip.
+- `app/hooks/useCaseSelection.ts` for session pool integration and round stats.
+- `app/lib/session-pool.ts`, `app/lib/case-progress.ts`, and `app/lib/round-stats.ts` for practice logic.
 - `app/hooks/__tests__/useTrainerState.test.ts` for state machine tests.
 
 If changing CSV behavior:
@@ -150,3 +151,6 @@ After UI changes:
 15. Toggle timer visibility and reload to confirm no hydration error.
 16. Mark a case as **Aprendido**, complete a round, and rate with **Bien** or **Mal**.
 17. Confirm learned cases appear less often in random mode and search shows the `OK` badge.
+18. Confirm the trainer card shows round progress (`Ronda X/Y`, nuevos/repaso) while practicing.
+19. Confirm sidebar **Estado** shows **Aprendidos** and **Por aprender** for the active piece type.
+20. Confirm `Space` confirms **Bien** at the rating stage and **Mal** requires a click.
