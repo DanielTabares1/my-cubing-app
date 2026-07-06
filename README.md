@@ -27,10 +27,12 @@ product entry point.
 - Random or sequential case selection with spaced-repetition weighting for learned cases.
 - Mark cases as learned (`Aprendido` / `Por aprender`) and rate each attempt (`Bien` / `Mal`).
 - Streak-based review: learned cases appear less often as recall improves; a failed rating resets the streak.
+- Round progress on the trainer card: current round (`3/8`), nuevos vs repaso split, and a progress bar.
+- Sidebar mastery counts for the active piece type (`Aprendidos`, `Por aprender`).
 - Visual timer that resets on each new case.
 - Keyboard shortcuts:
-  - `Space`: advance the current practice step.
-  - `R`: repeat the same case when available.
+  - `Space`: advance the current practice step; at the rating stage confirms **Bien**.
+  - `R`: repeat the same case when available (full algorithm mode).
 - The timer stays at `0.00` until a case is active.
 - Collapsible CSV import panel: visible first, hidden after import, reopenable
   via **Actualizar archivos CSV**.
@@ -156,7 +158,9 @@ Use them as upload templates. They are sparse but structurally valid.
 - `app/trainer/page.tsx`: trainer screen orchestration.
 - `app/components/CSVImporter.tsx`: CSV upload, validation, transformation.
 - `app/components/TrainerCard.tsx`: practice card UI and reveal states.
+- `app/components/RoundProgress.tsx`: round progress strip on the trainer card.
 - `app/components/VisualTimer.tsx`: timer display and visibility toggle.
+- `app/hooks/useCaseSelection.ts`: session pool, shuffle/sequential selection, round stats.
 - `app/hooks/useTrainerState.ts`: flashcard state machine.
 - `app/hooks/useLocalStorage.ts`: hydration-safe localStorage state.
 - `app/lib/csv-parser.ts`: PapaParse wrapper and matrix validation.
@@ -164,6 +168,7 @@ Use them as upload templates. They are sparse but structurally valid.
 - `app/lib/training-cases.ts`: merge, filter, and count helpers.
 - `app/lib/session-pool.ts`: spaced-repetition session pool builder.
 - `app/lib/case-progress.ts`: learned toggle and post-case rating mutations.
+- `app/lib/round-stats.ts`: catalog and round progress helpers.
 - `app/lib/types.ts`: shared domain types.
 
 More detailed notes live in `docs/`.

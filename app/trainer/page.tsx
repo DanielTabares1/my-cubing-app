@@ -40,7 +40,16 @@ export default function TrainerPage() {
     [normalizedCases, practicePiece],
   )
 
-  const { state, currentCase, advance, reset, startPractice, practiceCase } = useTrainerState(
+  const {
+    state,
+    currentCase,
+    advance,
+    reset,
+    startPractice,
+    practiceCase,
+    catalogStats,
+    roundStats,
+  } = useTrainerState(
     practiceCases,
     prefs.selectionMode,
     algorithmStep,
@@ -281,6 +290,11 @@ export default function TrainerPage() {
                     <Metric label="Esquinas" value={caseCounts.esquinas.toString()} />
                     <Metric label="Total" value={caseCounts.total.toString()} />
                     <Metric
+                      label="Aprendidos"
+                      value={`${catalogStats.learned}/${catalogStats.total}`}
+                    />
+                    <Metric label="Por aprender" value={catalogStats.unlearned.toString()} />
+                    <Metric
                       label="Modo"
                       value={prefs.selectionMode === 'random' ? 'Mix' : 'Seq'}
                     />
@@ -320,6 +334,7 @@ export default function TrainerPage() {
               onToggleLearned={handleToggleLearned}
               totalCases={practiceCases.length}
               algorithmStep={algorithmStep}
+              roundStats={roundStats}
             />
           </section>
         </section>

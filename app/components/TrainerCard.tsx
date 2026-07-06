@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 import type { TrainerState, TrainingCase } from '@/app/lib/types'
+import type { RoundStats } from '@/app/lib/round-stats'
 import { splitAlgorithmVariants } from '@/app/lib/algorithm-variants'
 import CaseCountBadge from './CaseCountBadge'
+import RoundProgress from './RoundProgress'
 
 export interface TrainerCardProps {
   state: TrainerState
@@ -15,6 +17,7 @@ export interface TrainerCardProps {
   onToggleLearned: () => void
   totalCases: number
   algorithmStep: boolean
+  roundStats: RoundStats | null
 }
 
 function primaryButtonLabel(state: TrainerState, algorithmStep: boolean): string {
@@ -51,6 +54,7 @@ export default function TrainerCard({
   onToggleLearned,
   totalCases,
   algorithmStep,
+  roundStats,
 }: TrainerCardProps) {
   const showPar = state >= 1 && currentCase !== null
   const showMemo = state >= 2 && currentCase !== null
@@ -75,45 +79,49 @@ export default function TrainerCard({
       role="region"
       aria-label="Tarjeta de practica"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-        <CaseCountBadge count={totalCases} />
-        <div className="flex flex-wrap items-center gap-2">
-          {showLearnedToggle && currentCase && (
-            <button
-              type="button"
-              onClick={onToggleLearned}
-              aria-pressed={currentCase.isLearned ?? false}
-              className={[
-                'inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-                currentCase.isLearned
-                  ? 'border-emerald-200/30 bg-emerald-200/10 text-emerald-100'
-                  : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]',
-              ].join(' ')}
-              aria-label={
-                currentCase.isLearned
-                  ? 'Marcar caso como no aprendido'
-                  : 'Marcar caso como aprendido'
-              }
-            >
-              <span
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CaseCountBadge count={totalCases} />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showLearnedToggle && currentCase && (
+              <button
+                type="button"
+                onClick={onToggleLearned}
+                aria-pressed={currentCase.isLearned ?? false}
                 className={[
-                  'size-2 rounded-full',
-                  currentCase.isLearned ? 'bg-emerald-300' : 'bg-stone-500',
+                  'inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                  currentCase.isLearned
+                    ? 'border-emerald-200/30 bg-emerald-200/10 text-emerald-100'
+                    : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]',
                 ].join(' ')}
-                aria-hidden="true"
-              />
-              {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
-              {(currentCase.streak ?? 0) > 0 && (
-                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-stone-300">
-                  racha {currentCase.streak}
-                </span>
-              )}
-            </button>
-          )}
-          <span className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
-            {stageLabels[state]}
-          </span>
+                aria-label={
+                  currentCase.isLearned
+                    ? 'Marcar caso como no aprendido'
+                    : 'Marcar caso como aprendido'
+                }
+              >
+                <span
+                  className={[
+                    'size-2 rounded-full',
+                    currentCase.isLearned ? 'bg-emerald-300' : 'bg-stone-500',
+                  ].join(' ')}
+                  aria-hidden="true"
+                />
+                {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
+                {(currentCase.streak ?? 0) > 0 && (
+                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-stone-300">
+                    racha {currentCase.streak}
+                  </span>
+                )}
+              </button>
+            )}
+            <span className="inline-flex min-h-8 items-center rounded-full border border-amber-200/20 bg-amber-200/10 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
+              {stageLabels[state]}
+            </span>
+          </div>
         </div>
+
+        {state > 0 && roundStats && <RoundProgress roundStats={roundStats} />}
       </div>
 
       <div

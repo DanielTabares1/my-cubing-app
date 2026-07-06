@@ -1,6 +1,6 @@
 # Product Requirements: My Cubing Tool MVP
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Product Direction
 
@@ -174,9 +174,10 @@ Requirements:
 
 - Practice only cases matching the active piece type (`practicePiece`).
 - Primary button advances the current flow.
-- `Space` triggers the same advance behavior.
+- `Space` triggers the same advance behavior; at the rating stage it confirms **Bien**.
 - In algorithm mode, state `3` shows a repeat button.
-- `R` repeats the same case from active states.
+- `R` repeats the same case from active states (including during rating in full
+  algorithm mode).
 - Timer resets whenever a new case starts, including a case selected from
   search.
 - Timer must not start when the app opens or while the trainer is idle.
@@ -214,17 +215,39 @@ After the final reveal step (algorithm in full mode, memo in solo memo mode),
 replace the primary advance button with:
 
 - **Bien**: successful recall — increment `streak` by 1, capped at 5, then
-  advance to the next case.
-- **Mal**: failed recall — reset `streak` to 0, then advance.
-
-During the rating stage, disable keyboard shortcuts so `Space` cannot skip
-evaluation.
+  advance to the next case. Auto-focused; `Space` triggers this action.
+- **Mal**: failed recall — reset `streak` to 0, then advance. Requires an
+  explicit click (not reachable via `Space` or keyboard tab).
 
 Ratings and the learned flag persist in `bld-trainer-cases`.
 
 ### Search UI
 
 Learned cases in sidebar search results show an `OK` badge.
+
+## Round Progress
+
+The trainer surfaces catalog and round progress during practice.
+
+### Catalog (sidebar Estado)
+
+For the active piece type, show:
+
+- **Aprendidos** — `learned / total`
+- **Por aprender** — unlearned count
+
+### Round (trainer card)
+
+While practicing (`state > 0`), show live round stats below the card header badges:
+
+- **Ronda X/Y** — cases completed vs current round size
+- **Nuevos** — unlearned cases in the current session pool
+- **Repaso** — learned cases in the current session pool
+- Progress bar and percentage for the active round
+
+Round stats come from `useCaseSelection.roundStats`. The pool composition is
+fixed for the duration of one shuffle round; catalog stats update immediately
+when learned flags or streaks change.
 
 ## Case Search
 
@@ -246,7 +269,8 @@ When cases are loaded, show separate counts for:
 
 - edge cases,
 - corner cases,
-- total cases.
+- total cases,
+- learned and unlearned counts for the active piece type.
 
 ## UI Principles
 

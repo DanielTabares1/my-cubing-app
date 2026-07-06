@@ -1,6 +1,6 @@
 # Data Model
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Domain Types
 
@@ -224,6 +224,43 @@ selection logic.
 `toggleCaseLearned(trainingCase)` flips `isLearned`.
 
 Ratings are persisted through `updateCaseInArray()` into `bld-trainer-cases`.
+
+### Round progress stats
+
+File:
+
+```text
+app/lib/round-stats.ts
+```
+
+Types:
+
+```ts
+interface CatalogStats {
+  total: number
+  unlearned: number
+  learned: number
+}
+
+interface RoundStats {
+  roundSize: number
+  unlearnedInRound: number
+  reviewInRound: number
+  completed: number
+  remaining: number
+}
+```
+
+Helpers:
+
+- `getCatalogStats(cases)` — aggregate counts for the active practice set.
+- `partitionSessionPool(pool)` — split pool into unlearned (nuevos) and learned
+  (repaso) cases.
+- `getRoundStats(pool, roundSize, completed)` — snapshot for the current round.
+
+`useCaseSelection` owns round tracking. A round is one session-pool cycle
+through the shuffled playlist (random) or pool index (sequential). Round pool
+composition is fixed until the round completes and a new pool is built.
 
 ## Persistence
 

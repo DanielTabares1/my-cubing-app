@@ -3,6 +3,8 @@
  * Requirements: 12.1, 12.3, 3.8
  */
 
+import type { CatalogStats, RoundStats } from './round-stats';
+
 // ---------------------------------------------------------------------------
 // Core domain types
 // ---------------------------------------------------------------------------
@@ -111,6 +113,8 @@ export interface UseTrainerStateReturn {
   startPractice: () => void;
   /** Start practicing a specific case selected by the user. */
   practiceCase: (trainingCase: TrainingCase) => void;
+  catalogStats: CatalogStats;
+  roundStats: RoundStats | null;
 }
 
 /** Return type of the useCaseSelection hook. */
@@ -123,4 +127,6 @@ export interface UseCaseSelectionReturn {
   hasMoreCases: boolean;
   /** Current sequential index into the cases array. */
   currentIndex: number;
+  catalogStats: CatalogStats;
+  roundStats: RoundStats | null;
 }

@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Overview
 
@@ -28,7 +28,7 @@ app/
 `app/trainer/page.tsx` owns page-level state and wires together:
 
 - `CSVImporter`: imports memo plus optional edge/corner algorithm CSVs.
-- `TrainerCard`: presentational practice card.
+- `TrainerCard`: presentational practice card with `RoundProgress` during active practice.
 - `VisualTimer`: case timer.
 - `CaseSearch`: local component for searching by letter pair.
 - `Metric`: local component for sidebar status counters.
@@ -46,8 +46,12 @@ The page is also responsible for:
 - Learned-toggle handler that flips `isLearned`.
 
 `TrainerCard` shows a rating stage after the final reveal step (memo in solo
-memo mode, algorithm in full mode). During rating, keyboard shortcuts are
-disabled so `Space` does not skip evaluation.
+memo mode, algorithm in full mode). **Bien** is auto-focused; `Space` confirms
+**Bien**. **Mal** requires an explicit click.
+
+When cases exist, sidebar **Estado** includes catalog mastery counts for the
+active piece type. During practice, the card header area shows live round
+progress below the badge row.
 
 ## Sidebar Behavior
 
@@ -58,7 +62,8 @@ When no cases are loaded:
 When cases exist and the import panel is closed:
 
 - **Actualizar archivos CSV** reopens import.
-- Status metrics show edge, corner, and total counts.
+- Status metrics show edge, corner, total, and catalog mastery counts
+  (`Aprendidos`, `Por aprender`) for the active piece type.
 - Case search and clear-data controls are available.
 
 After a successful import, the import panel closes automatically.
@@ -96,6 +101,8 @@ Returns:
 - `reset`
 - `startPractice`
 - `practiceCase`
+- `catalogStats`
+- `roundStats`
 
 States:
 
@@ -119,6 +126,19 @@ Selects next case randomly or sequentially from a spaced-repetition session pool
 - `'sequential'`: returns cases in session-pool order, cycling from the start.
 - `notifyCasePracticed()` removes a manually chosen case from the remaining
   shuffled round.
+- Exposes `catalogStats` and `roundStats` for the UI.
+
+### Round progress modules
+
+```text
+app/lib/round-stats.ts     getCatalogStats, getRoundStats, partitionSessionPool
+app/components/RoundProgress.tsx
+```
+
+`catalogStats` covers the full active practice set. `roundStats` tracks the
+current pool round: size, completed, remaining, and nuevos/repaso split. Round
+composition is fixed until the shuffle playlist completes and a new pool is
+built.
 
 ### Spaced repetition modules
 
@@ -133,9 +153,9 @@ See `docs/DATA_MODEL.md` for inclusion probabilities and streak rules.
 
 Global keyboard handler while the trainer is active.
 
-- `Space`: advance.
-- `R`: reset/repeat.
-- Skips input and textarea targets.
+- `Space`: advance; at the rating stage confirms **Bien**.
+- `R`: reset/repeat when enabled (full algorithm mode during rating).
+- Skips input, textarea, and focused button targets.
 
 ## Data Flow
 

@@ -19,8 +19,11 @@ import type { TrainingCase } from '../../lib/types';
 // ---------------------------------------------------------------------------
 
 /** Build a minimal TrainingCase for testing. */
-function makeCase(par: string): TrainingCase {
-  return { par, tipo: 'arista', memo: 'Test memo', algoritmo: 'R U R\'' };
+function makeCase(
+  par: string,
+  progress?: Partial<Pick<TrainingCase, 'isLearned' | 'streak'>>,
+): TrainingCase {
+  return { par, tipo: 'arista', memo: 'Test memo', algoritmo: 'R U R\'', ...progress };
 }
 
 /**
@@ -84,6 +87,35 @@ describe('Property 5: Random Case Selection Coverage', () => {
 
     expect(round).toHaveLength(cases.length);
     expect(new Set(round)).toEqual(new Set(cases.map((trainingCase) => trainingCase.par)));
+  });
+
+  test('exposes catalog stats and round progress during random practice', () => {
+    const cases = [
+      makeCase('A0'),
+      makeCase('A1', { isLearned: true }),
+      makeCase('A2'),
+      makeCase('A3', { isLearned: true }),
+    ];
+    const { result } = renderHook(() => useCaseSelection(cases));
+
+    expect(result.current.catalogStats).toEqual({
+      total: 4,
+      unlearned: 2,
+      learned: 2,
+    });
+    expect(result.current.roundStats).toBeNull();
+
+    act(() => {
+      result.current.selectCase('random');
+    });
+
+    expect(result.current.roundStats).not.toBeNull();
+    expect(result.current.roundStats?.completed).toBe(1);
+    expect(result.current.roundStats?.roundSize).toBeGreaterThan(0);
+    expect(
+      (result.current.roundStats?.unlearnedInRound ?? 0) +
+        (result.current.roundStats?.reviewInRound ?? 0),
+    ).toBe(result.current.roundStats?.roundSize);
   });
 
   test('random mode does not repeat until the round completes', () => {
