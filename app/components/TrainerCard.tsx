@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import type { TrainerState, TrainingCase } from '@/app/lib/types'
 import type { RoundStats } from '@/app/lib/round-stats'
+import { getCaseProgressBadge } from '@/app/lib/case-progress'
 import { splitAlgorithmVariants } from '@/app/lib/algorithm-variants'
 import CaseCountBadge from './CaseCountBadge'
 import RoundProgress from './RoundProgress'
@@ -66,6 +67,7 @@ export default function TrainerCard({
   const algorithmVariants = currentCase
     ? currentCase.algoritmos ?? splitAlgorithmVariants(currentCase.algoritmo)
     : []
+  const progressBadge = currentCase ? getCaseProgressBadge(currentCase) : null
 
   useEffect(() => {
     if (showRating) {
@@ -107,12 +109,19 @@ export default function TrainerCard({
                   ].join(' ')}
                   aria-hidden="true"
                 />
-                {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
-                {(currentCase.streak ?? 0) > 0 && (
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-stone-300">
-                    racha {currentCase.streak}
-                  </span>
-                )}
+              {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
+              {progressBadge && (
+                <span
+                  className={[
+                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                    progressBadge === 'Learned'
+                      ? 'bg-emerald-300/20 text-emerald-100'
+                      : 'bg-white/10 text-stone-300',
+                  ].join(' ')}
+                >
+                  {progressBadge}
+                </span>
+              )}
               </button>
             )}
             <span className="inline-flex min-h-8 items-center rounded-full border border-amber-200/20 bg-amber-200/10 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
