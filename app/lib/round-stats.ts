@@ -4,6 +4,7 @@
 
 import type { TrainingCase } from './types';
 import { normalizeTrainingCase } from './training-cases';
+import { MAX_STREAK } from './session-pool';
 
 export interface CatalogStats {
   total: number;
@@ -22,7 +23,7 @@ export interface RoundStats {
 /** Aggregate learned / unlearned counts for the active practice set. */
 export function getCatalogStats(cases: TrainingCase[]): CatalogStats {
   const normalized = cases.map(normalizeTrainingCase);
-  const learned = normalized.filter((trainingCase) => trainingCase.isLearned).length;
+  const learned = normalized.filter((c) => (c.streak ?? 0) >= MAX_STREAK).length;
 
   return {
     total: normalized.length,
@@ -31,14 +32,16 @@ export function getCatalogStats(cases: TrainingCase[]): CatalogStats {
   };
 }
 
-/** Split a session pool into always-included new cases and learned review cases. */
+/** Split a session pool into always-included new cases and old review cases. */
 export function partitionSessionPool(pool: TrainingCase[]): {
   unlearned: TrainingCase[];
   review: TrainingCase[];
 } {
   const normalized = pool.map(normalizeTrainingCase);
-  const unlearned = normalized.filter((trainingCase) => !trainingCase.isLearned);
-  const review = normalized.filter((trainingCase) => trainingCase.isLearned);
+  // "New" = streak < MAX_STREAK (always in session, mandatory reps)
+  // "Old" = streak >= MAX_STREAK (capped to ~10 review slots)
+  const unlearned = normalized.filter((c) => (c.streak ?? 0) < MAX_STREAK);
+  const review = normalized.filter((c) => (c.streak ?? 0) >= MAX_STREAK);
 
   return { unlearned, review };
 }

@@ -29,7 +29,7 @@ export function getCaseProgressBadge(trainingCase: TrainingCase): string | null 
   return null;
 }
 
-/** Apply a post-case rating: GOOD increments streak (capped), BAD resets streak and unlearns. */
+/** Apply a post-case rating: GOOD increments streak (capped), BAD penalises streak. */
 export function applyCaseRating(trainingCase: TrainingCase, rating: CaseRating): TrainingCase {
   const normalized = normalizeTrainingCase(trainingCase);
 
@@ -38,14 +38,21 @@ export function applyCaseRating(trainingCase: TrainingCase, rating: CaseRating):
     return {
       ...normalized,
       streak: nextStreak,
+      // Auto-mark as learned once streak reaches the maximum
       isLearned: nextStreak >= MAX_STREAK ? true : normalized.isLearned,
     };
   }
 
+  // BAD: streak 6–10 → drops to 5 (stays "old" but needs more reps)
+  //      streak < 6 → resets to 0 (back to fresh "new" case)
+  const currentStreak = normalized.streak ?? 0;
+  const nextStreak = currentStreak >= 6 ? 5 : 0;
+
   return {
     ...normalized,
-    streak: 0,
-    isLearned: normalized.isLearned ? false : normalized.isLearned,
+    streak: nextStreak,
+    // Un-learn if they had been marked learned
+    isLearned: normalized.isLearned && nextStreak >= MAX_STREAK ? true : false,
   };
 }
 
