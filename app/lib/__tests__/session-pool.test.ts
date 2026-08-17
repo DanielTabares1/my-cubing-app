@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  buildSessionPool,
-  getLearnedInclusionProbability,
-} from '../session-pool';
+import { buildSessionPool, MAX_STREAK, OLD_CASES_PER_SESSION } from '../session-pool';
 import type { TrainingCase } from '../types';
 
 function makeCase(
@@ -19,54 +16,56 @@ function makeCase(
   };
 }
 
-describe('getLearnedInclusionProbability', () => {
-  it('returns 80% for streak 0 or 1', () => {
-    expect(getLearnedInclusionProbability(0)).toBe(0.8);
-    expect(getLearnedInclusionProbability(1)).toBe(0.8);
-  });
-
-  it('returns 50% for streak 2 or 3', () => {
-    expect(getLearnedInclusionProbability(2)).toBe(0.5);
-    expect(getLearnedInclusionProbability(3)).toBe(0.5);
-  });
-
-  it('returns 20% for streak 4 or higher', () => {
-    expect(getLearnedInclusionProbability(4)).toBe(0.2);
-    expect(getLearnedInclusionProbability(5)).toBe(0.2);
-  });
-});
-
 describe('buildSessionPool', () => {
-  it('always includes unlearned cases', () => {
+  it('always includes new cases (streak < MAX_STREAK)', () => {
     const cases = [
-      makeCase('AB'),
-      makeCase('AC', { isLearned: true, streak: 5 }),
+      makeCase('AB', { streak: 0 }),
+      makeCase('AC', { streak: MAX_STREAK }),
     ];
 
     const pool = buildSessionPool(cases, () => 1);
-    expect(pool.map((trainingCase) => trainingCase.par)).toContain('AB');
+    const pars = pool.map((c) => c.par);
+    expect(pars).toContain('AB');
   });
 
-  it('includes learned cases when random check passes', () => {
-    const cases = [makeCase('AB', { isLearned: true, streak: 0 })];
-    const pool = buildSessionPool(cases, () => 0);
-    expect(pool).toHaveLength(1);
+  it('includes old cases (streak >= MAX_STREAK) up to OLD_CASES_PER_SESSION', () => {
+    // Create 20 old cases
+    const cases = Array.from({ length: 20 }, (_, i) =>
+      makeCase(`A${String.fromCharCode(65 + i)}`, { streak: MAX_STREAK }),
+    );
+
+    const pool = buildSessionPool(cases, Math.random);
+    expect(pool.length).toBeLessThanOrEqual(OLD_CASES_PER_SESSION);
+    expect(pool.length).toBeGreaterThan(0);
   });
 
-  it('excludes learned cases when random check fails', () => {
-    const cases = [makeCase('AB', { isLearned: true, streak: 5 })];
-    const pool = buildSessionPool(cases, () => 0.99);
-    expect(pool).toHaveLength(1);
+  it('includes all old cases when count is at or below the cap', () => {
+    const cases = [
+      makeCase('AB', { streak: MAX_STREAK }),
+      makeCase('AC', { streak: MAX_STREAK }),
+      makeCase('AD', { streak: MAX_STREAK }),
+    ];
+
+    const pool = buildSessionPool(cases, Math.random);
+    expect(pool.length).toBe(3);
+  });
+
+  it('includes both new and old cases in the same pool', () => {
+    const cases = [
+      makeCase('AB', { streak: 0 }),
+      makeCase('AC', { streak: MAX_STREAK }),
+    ];
+
+    const pool = buildSessionPool(cases, Math.random);
+    const pars = pool.map((c) => c.par);
+    expect(pars).toContain('AB');
+    expect(pars).toContain('AC');
   });
 
   it('never returns an empty pool when cases exist', () => {
-    const cases = [
-      makeCase('AB', { isLearned: true, streak: 5 }),
-      makeCase('AC', { isLearned: true, streak: 4 }),
-    ];
+    const cases = [makeCase('AB', { streak: MAX_STREAK })];
     const pool = buildSessionPool(cases, () => 0.99);
     expect(pool.length).toBeGreaterThan(0);
-    expect(pool[0]?.par).toBe('AC');
   });
 
   it('returns an empty array for no input cases', () => {

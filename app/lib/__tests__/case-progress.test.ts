@@ -22,13 +22,13 @@ function makeCase(overrides: Partial<TrainingCase> = {}): TrainingCase {
 }
 
 describe('applyCaseRating', () => {
-  it('increments streak on good rating up to the cap', () => {
+  it('increments streak by 1 on good rating', () => {
     const rated = applyCaseRating(makeCase({ streak: 4 }), 'good');
     expect(rated.streak).toBe(5);
   });
 
-  it('auto-learns when a good rating reaches MAX_STREAK', () => {
-    const rated = applyCaseRating(makeCase({ streak: 4, isLearned: false }), 'good');
+  it('auto-learns when a good rating reaches MAX_STREAK (10)', () => {
+    const rated = applyCaseRating(makeCase({ streak: MAX_STREAK - 1, isLearned: false }), 'good');
     expect(rated.streak).toBe(MAX_STREAK);
     expect(rated.isLearned).toBe(true);
   });
@@ -39,16 +39,22 @@ describe('applyCaseRating', () => {
     expect(rated.isLearned).toBe(true);
   });
 
-  it('resets streak and unlearns on bad rating for a learned case', () => {
-    const rated = applyCaseRating(makeCase({ streak: 4, isLearned: true }), 'bad');
-    expect(rated.streak).toBe(0);
-    expect(rated.isLearned).toBe(false);
+  it('bad rating: streak < 6 resets to 0', () => {
+    expect(applyCaseRating(makeCase({ streak: 0 }), 'bad').streak).toBe(0);
+    expect(applyCaseRating(makeCase({ streak: 3 }), 'bad').streak).toBe(0);
+    expect(applyCaseRating(makeCase({ streak: 5 }), 'bad').streak).toBe(0);
   });
 
-  it('resets streak on bad rating without changing an unlearned case', () => {
-    const rated = applyCaseRating(makeCase({ streak: 3, isLearned: false }), 'bad');
-    expect(rated.streak).toBe(0);
+  it('bad rating: streak 6–10 drops to 5', () => {
+    expect(applyCaseRating(makeCase({ streak: 6 }), 'bad').streak).toBe(5);
+    expect(applyCaseRating(makeCase({ streak: 8 }), 'bad').streak).toBe(5);
+    expect(applyCaseRating(makeCase({ streak: MAX_STREAK }), 'bad').streak).toBe(5);
+  });
+
+  it('bad rating unlearns a learned case', () => {
+    const rated = applyCaseRating(makeCase({ streak: MAX_STREAK, isLearned: true }), 'bad');
     expect(rated.isLearned).toBe(false);
+    expect(rated.streak).toBe(5);
   });
 });
 
@@ -67,7 +73,7 @@ describe('toggleCaseLearned', () => {
 });
 
 describe('progress badge helpers', () => {
-  it('shows Learned instead of racha 5 for full mastery', () => {
+  it('shows Learned for full mastery', () => {
     expect(getCaseProgressBadge(makeCase({ isLearned: true, streak: MAX_STREAK }))).toBe('Learned');
   });
 

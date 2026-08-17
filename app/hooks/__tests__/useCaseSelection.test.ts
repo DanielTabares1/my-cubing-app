@@ -92,9 +92,9 @@ describe('Property 5: Random Case Selection Coverage', () => {
   test('exposes catalog stats and round progress during random practice', () => {
     const cases = [
       makeCase('A0'),
-      makeCase('A1', { isLearned: true }),
+      makeCase('A1', { isLearned: true, streak: 10 }),
       makeCase('A2'),
-      makeCase('A3', { isLearned: true }),
+      makeCase('A3', { isLearned: true, streak: 10 }),
     ];
     const { result } = renderHook(() => useCaseSelection(cases));
 
