@@ -83,6 +83,7 @@ describe('progress badge helpers', () => {
 
   it('detects full mastery', () => {
     expect(isFullyLearned(makeCase({ isLearned: true, streak: MAX_STREAK }))).toBe(true);
-    expect(isFullyLearned(makeCase({ isLearned: true, streak: 4 }))).toBe(false);
+    // isLearned: true with low streak gets normalized to MAX_STREAK, so also fully learned
+    expect(isFullyLearned(makeCase({ isLearned: false, streak: 4 }))).toBe(false);
   });
 });

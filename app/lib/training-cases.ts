@@ -1,11 +1,18 @@
 import type { PieceType, TrainingCase } from './types';
+import { MAX_STREAK } from './session-pool';
 
 export function normalizeTrainingCase(trainingCase: TrainingCase): TrainingCase {
+  const streak = trainingCase.streak ?? 0;
+  const isLearned = trainingCase.isLearned ?? false;
+  // Migration: if a case was manually marked learned but streak didn't reach
+  // the new MAX_STREAK (10), bring the streak up so the session pool treats
+  // it correctly as an "old" case.
+  const resolvedStreak = isLearned && streak < MAX_STREAK ? MAX_STREAK : streak;
   return {
     ...trainingCase,
     tipo: trainingCase.tipo ?? 'arista',
-    isLearned: trainingCase.isLearned ?? false,
-    streak: trainingCase.streak ?? 0,
+    isLearned,
+    streak: resolvedStreak,
   };
 }
 
@@ -31,10 +38,14 @@ export function mergeCasesByType(
   const merged = imported.map((trainingCase) => {
     const progress = progressByKey.get(caseKey(normalizeTrainingCase(trainingCase)));
     if (!progress) return normalizeTrainingCase(trainingCase);
+    // If the existing record was learned, ensure streak reflects MAX_STREAK
+    const resolvedStreak = progress.isLearned && (progress.streak ?? 0) < MAX_STREAK
+      ? MAX_STREAK
+      : (progress.streak ?? 0);
     return normalizeTrainingCase({
       ...trainingCase,
       isLearned: progress.isLearned,
-      streak: progress.streak,
+      streak: resolvedStreak,
     });
   });
   return [...kept, ...merged];

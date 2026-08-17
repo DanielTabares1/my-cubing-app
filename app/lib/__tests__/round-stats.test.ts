@@ -29,14 +29,14 @@ describe('getCatalogStats', () => {
     expect(stats).toEqual({ total: 3, unlearned: 1, learned: 2 });
   });
 
-  it('counts isLearned cases with lower streak as unlearned', () => {
-    // isLearned flag alone is not enough — streak must reach MAX_STREAK
+  it('migrates isLearned cases with low streak up to MAX_STREAK', () => {
+    // isLearned: true with streak < MAX_STREAK gets normalized to streak = MAX_STREAK
     const stats = getCatalogStats([
-      makeCase('AB', { isLearned: true, streak: 5 }),   // streak < MAX_STREAK(10) → unlearned
+      makeCase('AB', { isLearned: true, streak: 5 }),   // normalized → streak 10 → learned
       makeCase('AC', { streak: MAX_STREAK }),            // old/learned
     ]);
 
-    expect(stats).toEqual({ total: 2, unlearned: 1, learned: 1 });
+    expect(stats).toEqual({ total: 2, unlearned: 0, learned: 2 });
   });
 });
 
