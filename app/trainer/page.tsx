@@ -28,6 +28,9 @@ export default function TrainerPage() {
   const [prefs, setPrefs] = useLocalStorage<UserPreferences>('bld-trainer-prefs', DEFAULT_PREFS)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [importPanelOpen, setImportPanelOpen] = useState(false)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const CONFIRM_PHRASE = 'borrar'
   const algorithmStep = prefs.algorithmStep ?? DEFAULT_PREFS.algorithmStep
   const practicePiece = prefs.practicePiece ?? DEFAULT_PREFS.practicePiece
 
@@ -141,6 +144,21 @@ export default function TrainerPage() {
     setErrorMessage(null)
     setImportPanelOpen(true)
   }, [setCases])
+
+  const handleClearDataClick = useCallback(() => {
+    setConfirmClearOpen(true)
+  }, [])
+
+  const handleConfirmClear = useCallback(() => {
+    setConfirmClearOpen(false)
+    setConfirmText('')
+    handleClearData()
+  }, [handleClearData])
+
+  const handleCancelClear = useCallback(() => {
+    setConfirmClearOpen(false)
+    setConfirmText('')
+  }, [])
 
   const handleToggleTimerVisibility = useCallback(() => {
     setPrefs((prev) => ({ ...prev, timerVisible: !prev.timerVisible }))
@@ -312,13 +330,62 @@ export default function TrainerPage() {
                   onSelectCase={practiceCase}
                 />
 
-                <button
-                  type="button"
-                  onClick={handleClearData}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-300/30 bg-red-400/10 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-400/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-                >
-                  Borrar datos cargados
-                </button>
+                {confirmClearOpen ? (
+                  <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-4">
+                    <p className="text-sm font-semibold text-red-100">
+                      Borrar todos los datos de practica
+                    </p>
+                    <p className="mt-1 text-sm text-red-200/70">
+                      Esta accion no se puede deshacer. Escribe{' '}
+                      <span className="font-mono font-semibold text-red-100">
+                        {CONFIRM_PHRASE}
+                      </span>{' '}
+                      para confirmar.
+                    </p>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && confirmText.toLowerCase() === CONFIRM_PHRASE) {
+                          handleConfirmClear()
+                        }
+                        if (e.key === 'Escape') {
+                          handleCancelClear()
+                        }
+                      }}
+                      placeholder={CONFIRM_PHRASE}
+                      className="mt-3 min-h-10 w-full rounded-lg border border-red-400/30 bg-stone-950/70 px-3 text-sm text-white outline-none transition placeholder:text-stone-600 focus:border-red-300/60 focus:ring-2 focus:ring-red-300/20"
+                      aria-label="Escribe borrar para confirmar"
+                    />
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmClear}
+                        disabled={confirmText.toLowerCase() !== CONFIRM_PHRASE}
+                        className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/30 px-4 text-sm font-semibold text-red-50 transition hover:bg-red-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200 disabled:cursor-not-allowed disabled:border-red-400/15 disabled:bg-red-500/10 disabled:text-red-200/40"
+                      >
+                        Borrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelClear}
+                        className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-medium text-stone-200 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleClearDataClick}
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-300/30 bg-red-400/10 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-400/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                  >
+                    Borrar datos cargados
+                  </button>
+                )}
               </>
             )}
           </aside>
