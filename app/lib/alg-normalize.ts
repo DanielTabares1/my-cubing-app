@@ -16,15 +16,44 @@
  */
 
 /**
+ * Normalizes 3-style algorithm notation so cubing.js can parse it.
+ *
+ * cubing.js supports commutator `[A, B]` and conjugate `[A: B]` syntax natively,
+ * but the user's CSV uses a non-standard shorthand: `setup:[commutator]`
+ * (without outer brackets). This module wraps such patterns into proper
+ * conjugate notation: `[setup: [commutator]]`.
+ *
+ * Parentheses are used purely for visual grouping (e.g. highlighting the
+ * "trigger" part of an alg). cubing.js doesn't treat them as meaningful
+ * notation, so we strip them — keeping the moves inside.
+ *
+ * Examples:
+ *   "R:[U R' U', M2]"             -> "[R: [U R' U', M2]]"
+ *   "S U' L:[E', L2]"             -> "[S U' L: [E', L2]]"
+ *   "x':[U L' U', M2]"            -> "[x': [U L' U', M2]]"
+ *   "R' U' R':[S, R2]"            -> "[R' U' R': [S, R2]]"
+ *   "[U R' U', M2]"               -> "[U R' U', M2]"  (unchanged)
+ *   "M2 U M2"                     -> "M2 U M2"       (unchanged)
+ *   "S U' L (E' L2 E L) U S'"     -> "S U' L E' L2 E L U S'"
+ *   "r U (M U2 M' U) r'"          -> "r U M U2 M' U r'"
+ */
+
+/**
  * Detects the `setup:[commutator]` pattern and wraps it in proper conjugate
  * notation. Handles nested setups, prime moves, slice moves, wide moves,
  * and whitespace.
- *
- * The pattern is: everything before `:[` that isn't already inside brackets,
- * followed by `:`, followed by `[commutator]`.
  */
 export function normalizeAlgForCubing(rawAlg: string): string {
-  const trimmed = rawAlg.trim()
+  let trimmed = rawAlg.trim()
+  if (!trimmed) return trimmed
+
+  // Strip parentheses — they are purely visual grouping for the user and
+  // cubing.js doesn't parse them as meaningful notation. Keep the content.
+  trimmed = trimmed.replace(/[()]/g, ' ')
+
+  // Collapse extra whitespace introduced by parenthesis removal.
+  trimmed = trimmed.replace(/\s+/g, ' ').trim()
+
   if (!trimmed) return trimmed
 
   // If the entire string is already a valid conjugate/commutator (starts with
