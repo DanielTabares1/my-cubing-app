@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { normalizeAlgForCubing } from '@/app/lib/alg-normalize'
 
 export interface CubeViewerProps {
   /** Algorithm in standard notation (e.g., "R U R' U'"). */
@@ -56,7 +57,7 @@ export default function CubeViewer({ alg, orientationAlg }: CubeViewerProps) {
         })
         player.style.width = '100%'
         player.style.height = '100%'
-        player.alg = algRef.current
+        player.alg = normalizeAlgForCubing(algRef.current)
         player.experimentalSetupAlg = orientationRef.current || ''
         container.appendChild(player)
         playerRef.current = player
@@ -85,7 +86,7 @@ export default function CubeViewer({ alg, orientationAlg }: CubeViewerProps) {
       | null
     if (!player) return
 
-    player.alg = alg
+    player.alg = normalizeAlgForCubing(alg)
     player.experimentalSetupAlg = orientationAlg || ''
     // Re-show the start frame (pre-solved state) after updating.
     player.jumpToStart()
