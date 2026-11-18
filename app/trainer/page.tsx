@@ -9,7 +9,7 @@ import { applyCaseRating, toggleCaseLearned, updateCaseInArray } from '@/app/lib
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
 import { useTrainerState } from '@/app/hooks/useTrainerState'
 import { useKeyboardShortcuts } from '@/app/hooks/useKeyboardShortcuts'
-import { CUBE_ORIENTATIONS, getOrientationPreset } from '@/app/lib/cube-orientation'
+import { CUBE_COLORS, CUBE_ORIENTATION_PRESETS, areOpposite, isInvalidOrientation, getOrientationRotationAlg, type CubeColor } from '@/app/lib/cube-orientation'
 import CSVImporter from '@/app/components/CSVImporter'
 import TrainerCard from '@/app/components/TrainerCard'
 import VisualTimer from '@/app/components/VisualTimer'
@@ -38,7 +38,7 @@ export default function TrainerPage() {
   const practicePiece = prefs.practicePiece ?? DEFAULT_PREFS.practicePiece
   const cubeVisible = prefs.cubeVisible ?? DEFAULT_PREFS.cubeVisible
   const cubeOrientation = prefs.cubeOrientation ?? DEFAULT_PREFS.cubeOrientation
-  const cubeOrientationPreset = getOrientationPreset(cubeOrientation)
+  const cubeOrientationAlg = getOrientationRotationAlg(cubeOrientation)
   const [configOpen, setConfigOpen] = useState(false)
 
   const normalizedCases = useMemo(() => normalizeTrainingCases(cases), [cases])
@@ -445,7 +445,7 @@ export default function TrainerPage() {
               algorithmStep={algorithmStep}
               roundStats={roundStats}
               cubeVisible={cubeVisible}
-              cubeOrientationAlg={cubeOrientationPreset.rotationAlg}
+              cubeOrientationAlg={cubeOrientationAlg}
             />
           </section>
         </section>
@@ -540,6 +540,10 @@ function ConfigPanel({
   onClose: () => void
 }) {
   const [expanded, setExpanded] = useState(true)
+  const top = cubeOrientation[0] ?? 'W'
+  const front = cubeOrientation[1] ?? 'G'
+  const invalidOrientation = isInvalidOrientation(top, front)
+
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]">
       <div className="flex items-center justify-between px-4 py-2">
@@ -597,17 +601,19 @@ function ConfigPanel({
 
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
-              Orientacion — Arriba / Frente
+              Orientacion
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {CUBE_ORIENTATIONS.map((preset) => (
+
+            {/* Quick presets */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {CUBE_ORIENTATION_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => onCubeOrientationChange(preset.id)}
                   aria-pressed={cubeOrientation === preset.id}
                   className={[
-                    'inline-flex min-h-7 items-center justify-center rounded-md border px-2 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                    'inline-flex min-h-7 items-center justify-center rounded-md border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
                     cubeOrientation === preset.id
                       ? 'border-cyan-200/40 bg-cyan-200/10 text-cyan-50'
                       : 'border-white/10 bg-white/[0.04] text-stone-400 hover:bg-white/[0.08] hover:text-stone-200',
@@ -617,9 +623,83 @@ function ConfigPanel({
                 </button>
               ))}
             </div>
+
+            {/* Custom color pickers */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <ColorPicker
+                label="Arriba"
+                value={top}
+                disabledColor={front}
+                onChange={(c) => onCubeOrientationChange(c + front)}
+              />
+              <ColorPicker
+                label="Frente"
+                value={front}
+                disabledColor={top}
+                onChange={(c) => onCubeOrientationChange(top + c)}
+              />
+            </div>
+
+            {invalidOrientation && (
+              <p className="mt-2 text-[11px] text-red-300">
+                Los colores no pueden ser iguales ni opuestos.
+              </p>
+            )}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const COLOR_SWATCHES: Record<string, string> = {
+  W: 'bg-white border-stone-300',
+  Y: 'bg-yellow-400 border-yellow-200',
+  G: 'bg-green-500 border-green-300',
+  B: 'bg-blue-500 border-blue-300',
+  R: 'bg-red-500 border-red-300',
+  O: 'bg-orange-500 border-orange-300',
+}
+
+function ColorPicker({
+  label,
+  value,
+  disabledColor,
+  onChange,
+}: {
+  label: string
+  value: string
+  disabledColor: string
+  onChange: (color: CubeColor) => void
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+        {label}
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {CUBE_COLORS.map((color) => {
+          const isDisabled = color.code === disabledColor || areOpposite(color.code, disabledColor)
+          return (
+            <button
+              key={color.code}
+              type="button"
+              onClick={() => !isDisabled && onChange(color.code)}
+              disabled={isDisabled}
+              aria-pressed={value === color.code}
+              aria-label={color.label}
+              className={[
+                'size-6 rounded-full border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                COLOR_SWATCHES[color.code] ?? 'bg-stone-500 border-stone-300',
+                value === color.code
+                  ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-stone-950'
+                  : '',
+                isDisabled ? 'opacity-25 cursor-not-allowed' : '',
+              ].join(' ')}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
