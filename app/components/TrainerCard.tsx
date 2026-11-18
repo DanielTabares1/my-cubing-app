@@ -7,6 +7,7 @@ import { getCaseProgressBadge } from '@/app/lib/case-progress'
 import { splitAlgorithmVariants } from '@/app/lib/algorithm-variants'
 import CaseCountBadge from './CaseCountBadge'
 import RoundProgress from './RoundProgress'
+import CubeViewer from './CubeViewer'
 
 export interface TrainerCardProps {
   state: TrainerState
@@ -19,6 +20,10 @@ export interface TrainerCardProps {
   totalCases: number
   algorithmStep: boolean
   roundStats: RoundStats | null
+  /** Whether the 3D cube viewer is enabled. */
+  cubeVisible: boolean
+  /** Whole-cube rotation alg for orientation. */
+  cubeOrientationAlg: string
 }
 
 function primaryButtonLabel(state: TrainerState, algorithmStep: boolean): string {
@@ -56,6 +61,8 @@ export default function TrainerCard({
   totalCases,
   algorithmStep,
   roundStats,
+  cubeVisible,
+  cubeOrientationAlg,
 }: TrainerCardProps) {
   const showPar = state >= 1 && currentCase !== null
   const showMemo = state >= 2 && currentCase !== null
@@ -68,6 +75,8 @@ export default function TrainerCard({
     ? currentCase.algoritmos ?? splitAlgorithmVariants(currentCase.algoritmo)
     : []
   const progressBadge = currentCase ? getCaseProgressBadge(currentCase) : null
+  const showCube = cubeVisible && state >= 1 && currentCase !== null
+  const currentAlg = algorithmVariants[0] ?? ''
 
   useEffect(() => {
     if (showRating) {
@@ -167,13 +176,31 @@ export default function TrainerCard({
           </div>
         ) : (
           <>
-            <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                Par
-              </p>
-              <p className="mt-3 text-7xl font-black leading-none tracking-normal text-white sm:text-8xl">
-                {showPar ? currentCase.par : '--'}
-              </p>
+            <section
+              className={[
+                'rounded-lg border border-white/10 bg-white/[0.035] p-5',
+                showCube ? 'flex items-center gap-5' : 'text-center',
+              ].join(' ')}
+            >
+              <div className={showCube ? 'shrink-0' : 'w-full'}>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+                  Par
+                </p>
+                <p className="mt-3 text-7xl font-black leading-none tracking-normal text-white sm:text-8xl">
+                  {showPar ? currentCase.par : '--'}
+                </p>
+              </div>
+              {showCube && (
+                <div
+                  className="min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10"
+                  style={{ height: '160px' }}
+                >
+                  <CubeViewer
+                    alg={currentAlg}
+                    orientationAlg={cubeOrientationAlg}
+                  />
+                </div>
+              )}
             </section>
 
             <section

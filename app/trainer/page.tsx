@@ -9,6 +9,7 @@ import { applyCaseRating, toggleCaseLearned, updateCaseInArray } from '@/app/lib
 import { useLocalStorage } from '@/app/hooks/useLocalStorage'
 import { useTrainerState } from '@/app/hooks/useTrainerState'
 import { useKeyboardShortcuts } from '@/app/hooks/useKeyboardShortcuts'
+import { CUBE_COLORS, CUBE_ORIENTATION_PRESETS, areOpposite, isInvalidOrientation, getOrientationRotationAlg, type CubeColor } from '@/app/lib/cube-orientation'
 import CSVImporter from '@/app/components/CSVImporter'
 import TrainerCard from '@/app/components/TrainerCard'
 import VisualTimer from '@/app/components/VisualTimer'
@@ -19,6 +20,8 @@ const DEFAULT_PREFS: UserPreferences = {
   algorithmStep: true,
   practicePiece: 'arista',
   theme: 'dark',
+  cubeVisible: false,
+  cubeOrientation: 'YG',
 }
 
 const EMPTY_TRAINING_CASES: TrainingCase[] = []
@@ -33,6 +36,10 @@ export default function TrainerPage() {
   const CONFIRM_PHRASE = 'borrar'
   const algorithmStep = prefs.algorithmStep ?? DEFAULT_PREFS.algorithmStep
   const practicePiece = prefs.practicePiece ?? DEFAULT_PREFS.practicePiece
+  const cubeVisible = prefs.cubeVisible ?? DEFAULT_PREFS.cubeVisible
+  const cubeOrientation = prefs.cubeOrientation ?? DEFAULT_PREFS.cubeOrientation
+  const cubeOrientationAlg = getOrientationRotationAlg(cubeOrientation)
+  const [configOpen, setConfigOpen] = useState(false)
 
   const normalizedCases = useMemo(() => normalizeTrainingCases(cases), [cases])
   const hasCases = normalizedCases.length > 0
@@ -182,6 +189,14 @@ export default function TrainerPage() {
     setPrefs((prev) => ({ ...prev, practicePiece: piece }))
   }, [setPrefs])
 
+  const handleToggleCubeVisible = useCallback(() => {
+    setPrefs((prev) => ({ ...prev, cubeVisible: !prev.cubeVisible }))
+  }, [setPrefs])
+
+  const handleCubeOrientationChange = useCallback((id: string) => {
+    setPrefs((prev) => ({ ...prev, cubeOrientation: id }))
+  }, [setPrefs])
+
   return (
     <main className="min-h-screen bg-stone-950 text-stone-100">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
@@ -252,8 +267,35 @@ export default function TrainerPage() {
               edgeCount={caseCounts.aristas}
               cornerCount={caseCounts.esquinas}
             />
+
+            <button
+              type="button"
+              onClick={() => setConfigOpen((v) => !v)}
+              aria-pressed={configOpen}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-medium text-stone-200 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+              aria-label="Configuracion"
+            >
+              <span
+                className={[
+                  'size-2 rounded-full shadow-[0_0_12px_rgba(103,232,249,0.7)]',
+                  cubeVisible ? 'bg-cyan-300' : 'bg-stone-500',
+                ].join(' ')}
+                aria-hidden="true"
+              />
+              Cubo 3D
+            </button>
           </div>
         </header>
+
+        {configOpen && (
+          <ConfigPanel
+            cubeVisible={cubeVisible}
+            onToggleCubeVisible={handleToggleCubeVisible}
+            cubeOrientation={cubeOrientation}
+            onCubeOrientationChange={handleCubeOrientationChange}
+            onClose={() => setConfigOpen(false)}
+          />
+        )}
 
         {errorMessage && (
           <div
@@ -402,6 +444,8 @@ export default function TrainerPage() {
               totalCases={practiceCases.length}
               algorithmStep={algorithmStep}
               roundStats={roundStats}
+              cubeVisible={cubeVisible}
+              cubeOrientationAlg={cubeOrientationAlg}
             />
           </section>
         </section>
@@ -479,6 +523,184 @@ function PieceToggleButton({
       <span>{label}</span>
       <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-stone-300">{count}</span>
     </button>
+  )
+}
+
+function ConfigPanel({
+  cubeVisible,
+  onToggleCubeVisible,
+  cubeOrientation,
+  onCubeOrientationChange,
+  onClose,
+}: {
+  cubeVisible: boolean
+  onToggleCubeVisible: () => void
+  cubeOrientation: string
+  onCubeOrientationChange: (id: string) => void
+  onClose: () => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const top = cubeOrientation[0] ?? 'W'
+  const front = cubeOrientation[1] ?? 'G'
+  const invalidOrientation = isInvalidOrientation(top, front)
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]">
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-stone-400 transition hover:text-stone-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+          aria-expanded={expanded}
+        >
+          <span
+            className={[
+              'text-xs text-stone-500 transition-transform',
+              expanded ? 'rotate-90' : '',
+            ].join(' ')}
+            aria-hidden="true"
+          >
+            {'>'}
+          </span>
+          Configuracion Cubo 3D
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid size-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-white/[0.06] hover:text-stone-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+          aria-label="Cerrar configuracion"
+        >
+          x
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="space-y-3 border-t border-white/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleCubeVisible}
+              aria-pressed={cubeVisible}
+              className={[
+                'inline-flex min-h-8 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                cubeVisible
+                  ? 'border-cyan-200/40 bg-cyan-200/10 text-cyan-50'
+                  : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'size-2 rounded-full',
+                  cubeVisible ? 'bg-cyan-300' : 'bg-stone-500',
+                ].join(' ')}
+                aria-hidden="true"
+              />
+              {cubeVisible ? 'Cubo visible' : 'Cubo oculto'}
+            </button>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-500">
+              Orientacion
+            </p>
+
+            {/* Quick presets */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {CUBE_ORIENTATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => onCubeOrientationChange(preset.id)}
+                  aria-pressed={cubeOrientation === preset.id}
+                  className={[
+                    'inline-flex min-h-7 items-center justify-center rounded-md border px-2.5 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                    cubeOrientation === preset.id
+                      ? 'border-cyan-200/40 bg-cyan-200/10 text-cyan-50'
+                      : 'border-white/10 bg-white/[0.04] text-stone-400 hover:bg-white/[0.08] hover:text-stone-200',
+                  ].join(' ')}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom color pickers */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <ColorPicker
+                label="Arriba"
+                value={top}
+                disabledColor={front}
+                onChange={(c) => onCubeOrientationChange(c + front)}
+              />
+              <ColorPicker
+                label="Frente"
+                value={front}
+                disabledColor={top}
+                onChange={(c) => onCubeOrientationChange(top + c)}
+              />
+            </div>
+
+            {invalidOrientation && (
+              <p className="mt-2 text-[11px] text-red-300">
+                Los colores no pueden ser iguales ni opuestos.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const COLOR_SWATCHES: Record<string, string> = {
+  W: 'bg-white border-stone-300',
+  Y: 'bg-yellow-400 border-yellow-200',
+  G: 'bg-green-500 border-green-300',
+  B: 'bg-blue-500 border-blue-300',
+  R: 'bg-red-500 border-red-300',
+  O: 'bg-orange-500 border-orange-300',
+}
+
+function ColorPicker({
+  label,
+  value,
+  disabledColor,
+  onChange,
+}: {
+  label: string
+  value: string
+  disabledColor: string
+  onChange: (color: CubeColor) => void
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+        {label}
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {CUBE_COLORS.map((color) => {
+          const isDisabled = color.code === disabledColor || areOpposite(color.code, disabledColor)
+          return (
+            <button
+              key={color.code}
+              type="button"
+              onClick={() => !isDisabled && onChange(color.code)}
+              disabled={isDisabled}
+              aria-pressed={value === color.code}
+              aria-label={color.label}
+              className={[
+                'size-6 rounded-full border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+                COLOR_SWATCHES[color.code] ?? 'bg-stone-500 border-stone-300',
+                value === color.code
+                  ? 'ring-2 ring-cyan-300 ring-offset-1 ring-offset-stone-950'
+                  : '',
+                isDisabled ? 'opacity-25 cursor-not-allowed' : '',
+              ].join(' ')}
+            />
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

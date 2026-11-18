@@ -62,6 +62,10 @@ export interface UserPreferences {
   /** Which piece type to practice: edges or corners. */
   practicePiece: PieceType;
   theme: 'light' | 'dark' | 'system';
+  /** Whether the 3D cube viewer is shown during practice. */
+  cubeVisible: boolean;
+  /** Orientation preset id (e.g. "YG" = yellow top, green front). */
+  cubeOrientation: string;
 }
 
 // ---------------------------------------------------------------------------
