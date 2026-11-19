@@ -20,22 +20,16 @@ export interface TrainerCardProps {
   totalCases: number
   algorithmStep: boolean
   roundStats: RoundStats | null
-  /** Whether the 3D cube viewer is enabled. */
   cubeVisible: boolean
-  /** Whole-cube rotation alg for orientation. */
   cubeOrientationAlg: string
 }
 
 function primaryButtonLabel(state: TrainerState, algorithmStep: boolean): string {
   switch (state) {
-    case 0:
-      return 'Empezar practica'
-    case 1:
-      return 'Revelar memo'
-    case 2:
-      return algorithmStep ? 'Revelar algoritmo' : 'Siguiente caso'
-    case 3:
-      return 'Siguiente caso'
+    case 0: return 'Empezar práctica'
+    case 1: return 'Revelar memo'
+    case 2: return algorithmStep ? 'Revelar algoritmo' : 'Siguiente caso'
+    case 3: return 'Siguiente caso'
   }
 }
 
@@ -43,11 +37,18 @@ function isRatingStage(state: TrainerState, algorithmStep: boolean): boolean {
   return algorithmStep ? state === 3 : state === 2
 }
 
-const stageLabels: Record<TrainerState, string> = {
-  0: 'Preparacion',
+const stageLabel: Record<TrainerState, string> = {
+  0: 'Preparación',
   1: 'Reconocimiento',
   2: 'Memoria',
-  3: 'Revision',
+  3: 'Revisión',
+}
+
+const stagePill: Record<TrainerState, string> = {
+  0: 'bg-[var(--bg-overlay)] text-[var(--text-muted)]',
+  1: 'bg-[var(--accent-lavender)] text-[var(--accent)]',
+  2: 'bg-[var(--warn-bg)] text-[var(--warn)]',
+  3: 'bg-[var(--success-bg)] text-[var(--success)]',
 }
 
 export default function TrainerCard({
@@ -64,7 +65,7 @@ export default function TrainerCard({
   cubeVisible,
   cubeOrientationAlg,
 }: TrainerCardProps) {
-  const showPar = state >= 1 && currentCase !== null
+  const showPar  = state >= 1 && currentCase !== null
   const showMemo = state >= 2 && currentCase !== null
   const showAlgo = algorithmStep && state >= 3 && currentCase !== null
   const canStart = state !== 0 || totalCases > 0
@@ -79,138 +80,126 @@ export default function TrainerCard({
   const currentAlg = algorithmVariants[0] ?? ''
 
   useEffect(() => {
-    if (showRating) {
-      goodButtonRef.current?.focus()
-    }
+    if (showRating) goodButtonRef.current?.focus()
   }, [showRating, currentCase?.par])
 
   return (
     <div
-      className="flex w-full max-w-3xl flex-col rounded-xl border border-white/10 bg-stone-950/85 p-4 shadow-2xl shadow-black/30 backdrop-blur sm:p-6 lg:p-8"
+      className="w-full max-w-2xl rounded-3xl bg-[var(--bg-surface)]"
+      style={{ boxShadow: 'var(--shadow-card)' }}
       role="region"
-      aria-label="Tarjeta de practica"
+      aria-label="Tarjeta de práctica"
     >
-      <div className="flex flex-col gap-3 border-b border-white/10 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CaseCountBadge count={totalCases} />
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {showLearnedToggle && currentCase && (
-              <button
-                type="button"
-                onClick={onToggleLearned}
-                aria-pressed={currentCase.isLearned ?? false}
-                className={[
-                  'inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold uppercase tracking-[0.12em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-                  currentCase.isLearned
-                    ? 'border-emerald-200/30 bg-emerald-200/10 text-emerald-100'
-                    : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]',
-                ].join(' ')}
-                aria-label={
-                  currentCase.isLearned
-                    ? 'Marcar caso como no aprendido'
-                    : 'Marcar caso como aprendido'
-                }
-              >
-                <span
-                  className={[
-                    'size-2 rounded-full',
-                    currentCase.isLearned ? 'bg-emerald-300' : 'bg-stone-500',
-                  ].join(' ')}
-                  aria-hidden="true"
-                />
+      {/* ── Header ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-6 py-4">
+        <CaseCountBadge count={totalCases} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {showLearnedToggle && currentCase && (
+            <button
+              type="button"
+              onClick={onToggleLearned}
+              aria-pressed={currentCase.isLearned ?? false}
+              className={[
+                'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold uppercase tracking-[0.12em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+                currentCase.isLearned
+                  ? 'border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]'
+                  : 'border-[var(--border-muted)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]',
+              ].join(' ')}
+            >
+              <span
+                className={['size-1.5 rounded-full', currentCase.isLearned ? 'bg-[var(--success)]' : 'bg-[var(--text-muted)]'].join(' ')}
+                aria-hidden="true"
+              />
               {currentCase.isLearned ? 'Aprendido' : 'Por aprender'}
               {progressBadge && (
-                <span
-                  className={[
-                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-                    progressBadge === 'Learned'
-                      ? 'bg-emerald-300/20 text-emerald-100'
-                      : 'bg-white/10 text-stone-300',
-                  ].join(' ')}
-                >
+                <span className="ml-0.5 rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
                   {progressBadge}
                 </span>
               )}
-              </button>
-            )}
-            <span className="inline-flex min-h-8 items-center rounded-full border border-amber-200/20 bg-amber-200/10 px-3 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
-              {stageLabels[state]}
-            </span>
-          </div>
-        </div>
+            </button>
+          )}
 
-        {state > 0 && roundStats && <RoundProgress roundStats={roundStats} />}
+          <span className={['inline-flex h-7 items-center rounded-full px-3 text-[11px] font-semibold uppercase tracking-[0.12em]', stagePill[state]].join(' ')}>
+            {stageLabel[state]}
+          </span>
+        </div>
       </div>
 
+      {/* ── Round progress ── */}
+      {state > 0 && roundStats && (
+        <div className="border-b border-[var(--border-subtle)] px-6 py-3">
+          <RoundProgress roundStats={roundStats} />
+        </div>
+      )}
+
+      {/* ── Body ── */}
       <div
         className={[
-          'py-4',
+          'px-6',
           state === 0
-            ? 'grid min-h-[240px] place-items-center sm:min-h-[280px]'
-            : 'flex flex-col gap-5',
+            ? 'flex min-h-[260px] items-center justify-center py-8'
+            : 'flex flex-col gap-4 py-5',
         ].join(' ')}
       >
         {state === 0 ? (
-          <div className="mx-auto flex max-w-md flex-col items-center text-center">
+          <div className="flex flex-col items-center text-center">
+            {/* Decorative icon */}
             <div
-              className="mb-6 grid size-24 place-items-center rounded-xl border border-cyan-200/20 bg-cyan-200/10"
+              className="mb-6 grid size-20 place-items-center rounded-3xl bg-[var(--accent-lavender)]"
               aria-hidden="true"
             >
-              <div className="grid grid-cols-2 gap-1">
-                <span className="size-6 rounded-sm bg-cyan-200" />
-                <span className="size-6 rounded-sm bg-emerald-300" />
-                <span className="size-6 rounded-sm bg-amber-200" />
-                <span className="size-6 rounded-sm bg-stone-300" />
+              <div className="grid grid-cols-2 gap-1.5">
+                <span className="size-5 rounded-md bg-[var(--accent)]" />
+                <span className="size-5 rounded-md bg-[var(--accent-sky)]" />
+                <span className="size-5 rounded-md bg-[var(--warn)]" />
+                <span className="size-5 rounded-md bg-[var(--success-light)]" />
               </div>
             </div>
-            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-              {totalCases === 0 ? 'Carga tus matrices CSV' : 'Sesion lista'}
+            <h2 className="text-2xl font-bold text-[var(--text-primary)]">
+              {totalCases === 0 ? 'Carga tus matrices CSV' : 'Sesión lista'}
             </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-300">
+            <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--text-secondary)]">
               {totalCases === 0
-                ? 'Importa algoritmos y memos para activar la practica.'
-                : algorithmStep
-                  ? 'Usa espacio para avanzar rapido. En evaluacion, espacio confirma Bien.'
-                  : 'Usa espacio para avanzar rapido. En evaluacion, espacio confirma Bien.'}
+                ? 'Importa algoritmos y memos para activar la práctica.'
+                : 'Usa espacio para avanzar. En evaluación, espacio confirma Bien.'}
             </p>
           </div>
         ) : (
           <>
+            {/* Par */}
             <section
               className={[
-                'rounded-lg border border-white/10 bg-white/[0.035] p-5',
+                'rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-base)] p-5',
                 showCube ? 'flex items-center gap-5' : 'text-center',
               ].join(' ')}
             >
               <div className={showCube ? 'shrink-0' : 'w-full'}>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
                   Par
                 </p>
-                <p className="mt-3 text-7xl font-black leading-none tracking-normal text-white sm:text-8xl">
-                  {showPar ? currentCase.par : '--'}
+                <p className="mt-2 text-7xl font-black leading-none tracking-tight text-[var(--accent)] sm:text-8xl">
+                  {showPar ? currentCase.par : (
+                    <span className="text-[var(--border-muted)]">--</span>
+                  )}
                 </p>
               </div>
               {showCube && (
                 <div
-                  className="min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10"
+                  className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-[var(--border-subtle)]"
                   style={{ height: '160px' }}
                 >
-                  <CubeViewer
-                    alg={currentAlg}
-                    orientationAlg={cubeOrientationAlg}
-                  />
+                  <CubeViewer alg={currentAlg} orientationAlg={cubeOrientationAlg} />
                 </div>
               )}
             </section>
 
+            {/* Memo + Algorithm */}
             <section
-              className={[
-                'grid gap-3',
-                algorithmStep ? 'sm:grid-cols-2' : 'sm:grid-cols-1',
-              ].join(' ')}
+              className={['grid gap-3', algorithmStep ? 'sm:grid-cols-2' : 'grid-cols-1'].join(' ')}
             >
-              <RevealPanel label="Memo" visible={showMemo}>
-                <span className="text-2xl font-semibold text-amber-100 sm:text-3xl">
+              <RevealPanel label="Memo" visible={showMemo} tone="warn">
+                <span className="text-2xl font-bold text-[var(--warn)] sm:text-3xl">
                   {currentCase?.memo}
                 </span>
               </RevealPanel>
@@ -219,6 +208,7 @@ export default function TrainerCard({
                 <RevealPanel
                   label={algorithmVariants.length > 1 ? 'Algoritmos' : 'Algoritmo'}
                   visible={showAlgo}
+                  tone="success"
                 >
                   <AlgorithmVariants variants={algorithmVariants} />
                 </RevealPanel>
@@ -228,27 +218,24 @@ export default function TrainerCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row">
+      {/* ── Action bar ── */}
+      <div className="flex flex-col gap-2.5 border-t border-[var(--border-subtle)] px-6 py-4 sm:flex-row">
         {showRating ? (
           <>
             <button
               ref={goodButtonRef}
               type="button"
               onClick={onRateGood}
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-stone-950 ring-2 ring-emerald-100 ring-offset-2 ring-offset-stone-950 transition hover:bg-emerald-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
-              aria-label="Bien — recuerdo correcto"
+              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--success)] px-5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(14,158,142,0.30)] transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--success)]"
             >
               Bien
-              <span className="text-xs font-medium uppercase tracking-wide text-stone-700/80">
-                (Space)
-              </span>
+              <span className="text-xs font-medium text-white/60">(Space)</span>
             </button>
             <button
               type="button"
               onClick={onRateBad}
               tabIndex={-1}
-              className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg border border-red-300/40 bg-red-400/15 px-5 text-sm font-semibold text-red-100 transition hover:bg-red-400/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-              aria-label="Mal — olvide memo o algoritmo"
+              className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-5 text-sm font-bold text-[var(--danger)] transition hover:bg-[var(--danger)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]"
             >
               Mal
             </button>
@@ -256,8 +243,7 @@ export default function TrainerCard({
               <button
                 type="button"
                 onClick={onReset}
-                className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-stone-100 transition hover:bg-white/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:flex-none"
-                aria-label="Repetir caso"
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[var(--border-muted)] px-5 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none sm:flex-none"
               >
                 Repetir (R)
               </button>
@@ -269,12 +255,11 @@ export default function TrainerCard({
             onClick={onAdvance}
             disabled={!canStart}
             className={[
-              'inline-flex min-h-12 flex-1 items-center justify-center rounded-lg px-5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+              'inline-flex h-12 flex-1 items-center justify-center rounded-2xl px-5 text-sm font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
               canStart
-                ? 'bg-cyan-200 text-stone-950 hover:bg-cyan-100 active:bg-cyan-300'
-                : 'cursor-not-allowed bg-white/[0.06] text-stone-500',
+                ? 'bg-[var(--accent)] text-white shadow-[0_4px_16px_rgba(62,54,176,0.30)] hover:bg-[var(--accent-mid)]'
+                : 'cursor-not-allowed bg-[var(--bg-overlay)] text-[var(--text-muted)]',
             ].join(' ')}
-            aria-label={primaryButtonLabel(state, algorithmStep)}
           >
             {primaryButtonLabel(state, algorithmStep)}
           </button>
@@ -284,27 +269,27 @@ export default function TrainerCard({
   )
 }
 
+/* ─── Algorithm variants ────────────────────────────────────────────────────── */
 function AlgorithmVariants({ variants }: { variants: string[] }) {
   if (variants.length <= 1) {
     return (
-      <span className="block break-words font-mono text-base leading-7 text-emerald-100 sm:text-lg">
+      <span className="block break-words font-mono text-base leading-7 text-[var(--success)] sm:text-lg">
         {variants[0]}
       </span>
     )
   }
-
   return (
-    <div className="max-h-56 overflow-y-auto pr-1">
+    <div className="max-h-52 overflow-y-auto pr-1">
       <div className="grid gap-2">
         {variants.map((variant, index) => (
           <div
             key={`${index}-${variant}`}
-            className="grid grid-cols-[2rem_1fr] gap-3 rounded-md border border-white/10 bg-stone-950/55 px-3 py-2"
+            className="grid grid-cols-[1.75rem_1fr] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2"
           >
-            <span className="mt-0.5 text-xs font-semibold tabular-nums text-stone-500">
+            <span className="mt-0.5 text-xs font-semibold tabular-nums text-[var(--text-muted)]">
               {index + 1}
             </span>
-            <span className="break-words font-mono text-sm leading-6 text-emerald-100 sm:text-base">
+            <span className="break-words font-mono text-sm leading-6 text-[var(--success)] sm:text-base">
               {variant}
             </span>
           </div>
@@ -314,27 +299,27 @@ function AlgorithmVariants({ variants }: { variants: string[] }) {
   )
 }
 
-function RevealPanel({
-  label,
-  visible,
-  children,
-}: {
-  label: string
-  visible: boolean
-  children: React.ReactNode
-}) {
+/* ─── Reveal panel ──────────────────────────────────────────────────────────── */
+function RevealPanel({ label, visible, tone, children }: { label: string; visible: boolean; tone: 'warn' | 'success'; children: React.ReactNode }) {
+  const activeBorder = tone === 'warn' ? 'border-[var(--warn-border)]'    : 'border-[var(--success-border)]'
+  const activeLabel  = tone === 'warn' ? 'text-[var(--warn)]'             : 'text-[var(--success)]'
+  const activeBg     = tone === 'warn' ? 'bg-[var(--warn-bg)]'            : 'bg-[var(--success-bg)]'
+
   return (
-    <div className="rounded-lg border border-white/10 bg-stone-900/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+    <div className={[
+      'rounded-2xl border p-4 transition-colors duration-200',
+      visible ? [activeBorder, activeBg].join(' ') : 'border-[var(--border-subtle)] bg-[var(--bg-base)]',
+    ].join(' ')}>
+      <p className={['text-[10px] font-semibold uppercase tracking-[0.20em]', visible ? activeLabel : 'text-[var(--text-muted)]'].join(' ')}>
         {label}
       </p>
       <div className="mt-3">
         {visible ? (
-          <div className="animate-fade-in w-full">{children}</div>
+          <div className="animate-fade-in">{children}</div>
         ) : (
-          <div className="grid w-full gap-3" aria-hidden="true">
-            <span className="h-3 w-3/4 rounded-full bg-white/[0.07]" />
-            <span className="h-3 w-1/2 rounded-full bg-white/[0.05]" />
+          <div className="grid gap-2.5" aria-hidden="true">
+            <span className="h-2.5 w-3/4 rounded-full bg-black/[0.06]" />
+            <span className="h-2.5 w-1/2 rounded-full bg-black/[0.04]" />
           </div>
         )}
       </div>

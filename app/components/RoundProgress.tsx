@@ -1,74 +1,54 @@
 import type { RoundStats } from '@/app/lib/round-stats'
 
 export default function RoundProgress({ roundStats }: { roundStats: RoundStats }) {
-  const progressPercent =
+  const pct =
     roundStats.roundSize > 0
       ? Math.round((roundStats.completed / roundStats.roundSize) * 100)
       : 0
 
   return (
-    <div
-      className="flex min-w-0 flex-col gap-2.5"
-      aria-label={`Ronda ${roundStats.completed} de ${roundStats.roundSize}`}
-    >
+    <div className="flex flex-col gap-2" aria-label={`Ronda ${roundStats.completed} de ${roundStats.roundSize}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-200">
-          <span
-            className="size-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.55)]"
-            aria-hidden="true"
-          />
+        <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-lavender)] px-2.5 text-[11px] font-semibold text-[var(--accent)]">
           Ronda{' '}
-          <span className="tabular-nums text-cyan-100">
-            {roundStats.completed}/{roundStats.roundSize}
-          </span>
+          <span className="tabular-nums">{roundStats.completed}/{roundStats.roundSize}</span>
         </span>
 
-        <StatPill label="Nuevos" value={roundStats.unlearnedInRound} tone="stone" />
-        <StatPill label="Repaso" value={roundStats.reviewInRound} tone="emerald" />
+        <StatPill label="Nuevos" value={roundStats.unlearnedInRound} tone="neutral" />
+        <StatPill label="Repaso" value={roundStats.reviewInRound}    tone="success" />
 
-        <span className="ml-auto text-xs tabular-nums text-stone-500">{progressPercent}%</span>
+        <span className="ml-auto text-[11px] tabular-nums text-[var(--text-muted)]">{pct}%</span>
       </div>
 
       <div
-        className="h-1 overflow-hidden rounded-full bg-white/[0.08]"
+        className="h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]"
         role="progressbar"
         aria-valuenow={roundStats.completed}
         aria-valuemin={0}
         aria-valuemax={roundStats.roundSize}
-        aria-label="Progreso de la ronda"
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300 transition-[width] duration-300 ease-out"
-          style={{ width: `${progressPercent}%` }}
+          className="h-full rounded-full transition-[width] duration-300 ease-out"
+          style={{
+            width: `${pct}%`,
+            background: 'linear-gradient(90deg, var(--accent) 0%, var(--accent-sky) 100%)',
+          }}
         />
       </div>
     </div>
   )
 }
 
-function StatPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: number
-  tone: 'stone' | 'emerald'
-}) {
-  const toneClasses =
-    tone === 'emerald'
-      ? 'border-emerald-200/20 bg-emerald-200/[0.07] text-emerald-100'
-      : 'border-white/10 bg-white/[0.04] text-stone-300'
-
+function StatPill({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'success' }) {
   return (
-    <span
-      className={[
-        'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium uppercase tracking-[0.1em]',
-        toneClasses,
-      ].join(' ')}
-    >
+    <span className={[
+      'inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium',
+      tone === 'success'
+        ? 'border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success)]'
+        : 'border-[var(--border-subtle)] bg-[var(--bg-overlay)] text-[var(--text-secondary)]',
+    ].join(' ')}>
       {label}
-      <span className="tabular-nums text-white">{value}</span>
+      <span className="tabular-nums font-semibold">{value}</span>
     </span>
   )
 }
