@@ -22,14 +22,10 @@ interface FileState {
   errorMessage: string | null
 }
 
-const initialFileState: FileState = {
-  file: null,
-  status: 'idle',
-  errorMessage: null,
-}
+const initialFileState: FileState = { file: null, status: 'idle', errorMessage: null }
 
 const FILE_LABELS: Record<FileKind, string> = {
-  memo: 'Memos (obligatorio)',
+  memo: 'Memos',
   'algo-arista': 'Algoritmos aristas',
   'algo-esquina': 'Algoritmos esquinas',
 }
@@ -40,19 +36,23 @@ export default function CSVImporter({
   onError,
   onDismiss,
 }: CSVImporterProps) {
-  const [memoState, setMemoState] = useState<FileState>(initialFileState)
-  const [edgeAlgoState, setEdgeAlgoState] = useState<FileState>(initialFileState)
+  const [memoState, setMemoState]           = useState<FileState>(initialFileState)
+  const [edgeAlgoState, setEdgeAlgoState]   = useState<FileState>(initialFileState)
   const [cornerAlgoState, setCornerAlgoState] = useState<FileState>(initialFileState)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [globalError, setGlobalError] = useState<string | null>(null)
-  const [importSummary, setImportSummary] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing]     = useState(false)
+  const [globalError, setGlobalError]       = useState<string | null>(null)
+  const [importSummary, setImportSummary]   = useState<string | null>(null)
 
-  const memoInputRef = useRef<HTMLInputElement>(null)
-  const edgeAlgoInputRef = useRef<HTMLInputElement>(null)
-  const cornerAlgoInputRef = useRef<HTMLInputElement>(null)
+  const memoInputRef        = useRef<HTMLInputElement>(null)
+  const edgeAlgoInputRef    = useRef<HTMLInputElement>(null)
+  const cornerAlgoInputRef  = useRef<HTMLInputElement>(null)
 
-  const hasAlgoFile = edgeAlgoState.file !== null || cornerAlgoState.file !== null
-  const canProcess = memoState.file !== null && hasAlgoFile && !isProcessing
+  // When cases already exist, memo is optional (the existing memos are reused).
+  const hasCases       = existingCases.length > 0
+  const hasAlgoFile    = edgeAlgoState.file !== null || cornerAlgoState.file !== null
+  const memoRequired   = !hasCases   // memo is only mandatory on first import
+  const memoProvided   = memoState.file !== null
+  const canProcess     = hasAlgoFile && (memoRequired ? memoProvided : true) && !isProcessing
 
   const fileStates: Record<FileKind, FileState> = {
     memo: memoState,
@@ -61,8 +61,8 @@ export default function CSVImporter({
   }
 
   const setFileState = useCallback((kind: FileKind, next: FileState) => {
-    if (kind === 'memo') setMemoState(next)
-    if (kind === 'algo-arista') setEdgeAlgoState(next)
+    if (kind === 'memo')         setMemoState(next)
+    if (kind === 'algo-arista')  setEdgeAlgoState(next)
     if (kind === 'algo-esquina') setCornerAlgoState(next)
   }, [])
 
@@ -72,82 +72,65 @@ export default function CSVImporter({
     setImportSummary(null)
   }, [setFileState])
 
-  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); e.stopPropagation()
   }, [])
 
   const handleDrop = useCallback(
-    (kind: FileKind) => (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      event.stopPropagation()
-      const droppedFile = event.dataTransfer.files?.[0]
-      if (droppedFile) {
-        applyFile(kind, droppedFile)
-      }
+    (kind: FileKind) => (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault(); e.stopPropagation()
+      const f = e.dataTransfer.files?.[0]
+      if (f) applyFile(kind, f)
     },
     [applyFile],
   )
 
   function handleInputChange(kind: FileKind) {
-    return (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0]
-      if (file) {
-        applyFile(kind, file)
-      }
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0]
+      if (f) applyFile(kind, f)
     }
   }
 
   async function parseAndValidate(file: File, label: string) {
     const parsed = await parseCSVFile(file)
     const validation = validateMatrixStructure(parsed)
-
-    if (!validation.isValid) {
-      throw new Error(`${label}: ${validation.errors.join(' ')}`)
-    }
-
+    if (!validation.isValid) throw new Error(`${label}: ${validation.errors.join(' ')}`)
     return parsed
   }
 
   function markSuccess(kind: FileKind) {
-    const current = fileStates[kind]
-    setFileState(kind, { ...current, status: 'success', errorMessage: null })
+    setFileState(kind, { ...fileStates[kind], status: 'success', errorMessage: null })
   }
-
   function markError(kind: FileKind, message: string) {
-    const current = fileStates[kind]
-    setFileState(kind, { ...current, status: 'error', errorMessage: message })
+    setFileState(kind, { ...fileStates[kind], status: 'error', errorMessage: message })
   }
 
   async function processFiles() {
-    if (!memoState.file || !hasAlgoFile) return
+    if (!canProcess) return
 
     setIsProcessing(true)
     setGlobalError(null)
     setImportSummary(null)
 
-    if (memoState.file) {
-      setMemoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
-    }
-    if (edgeAlgoState.file) {
-      setEdgeAlgoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
-    }
-    if (cornerAlgoState.file) {
-      setCornerAlgoState((prev) => ({ ...prev, status: 'idle', errorMessage: null }))
-    }
+    // Reset statuses
+    if (memoState.file)       setMemoState((p)       => ({ ...p, status: 'idle', errorMessage: null }))
+    if (edgeAlgoState.file)   setEdgeAlgoState((p)   => ({ ...p, status: 'idle', errorMessage: null }))
+    if (cornerAlgoState.file) setCornerAlgoState((p) => ({ ...p, status: 'idle', errorMessage: null }))
 
     try {
-      const memoMatrix = await parseAndValidate(memoState.file, 'Matriz de memos')
-      markSuccess('memo')
+      // If no new memo is provided, build a synthetic ParsedMatrix from existing cases
+      const memoMatrix = memoState.file
+        ? await parseAndValidate(memoState.file, 'Matriz de memos')
+        : buildMemoMatrixFromCases(existingCases)
+
+      if (memoState.file) markSuccess('memo')
 
       let mergedCases = normalizeTrainingCases(existingCases)
       const importedCounts = { aristas: 0, esquinas: 0 }
 
       if (edgeAlgoState.file) {
-        const edgeAlgoMatrix = await parseAndValidate(
-          edgeAlgoState.file,
-          'Matriz de algoritmos (aristas)',
-        )
+        const edgeAlgoMatrix = await parseAndValidate(edgeAlgoState.file, 'Matriz de algoritmos (aristas)')
         const edgeCases = transformMatrices(edgeAlgoMatrix, memoMatrix, 'arista')
         mergedCases = mergeCasesByType(mergedCases, edgeCases, 'arista')
         importedCounts.aristas = edgeCases.length
@@ -155,10 +138,7 @@ export default function CSVImporter({
       }
 
       if (cornerAlgoState.file) {
-        const cornerAlgoMatrix = await parseAndValidate(
-          cornerAlgoState.file,
-          'Matriz de algoritmos (esquinas)',
-        )
+        const cornerAlgoMatrix = await parseAndValidate(cornerAlgoState.file, 'Matriz de algoritmos (esquinas)')
         const cornerCases = transformMatrices(cornerAlgoMatrix, memoMatrix, 'esquina')
         mergedCases = mergeCasesByType(mergedCases, cornerCases, 'esquina')
         importedCounts.esquinas = cornerCases.length
@@ -166,35 +146,17 @@ export default function CSVImporter({
       }
 
       const summaryParts: string[] = []
-      if (importedCounts.aristas > 0) {
-        summaryParts.push(`${importedCounts.aristas} aristas`)
-      }
-      if (importedCounts.esquinas > 0) {
-        summaryParts.push(`${importedCounts.esquinas} esquinas`)
-      }
-
-      setImportSummary(
-        `Importados ${summaryParts.join(' y ')} (${mergedCases.length} casos en total).`,
-      )
+      if (importedCounts.aristas > 0) summaryParts.push(`${importedCounts.aristas} aristas`)
+      if (importedCounts.esquinas > 0) summaryParts.push(`${importedCounts.esquinas} esquinas`)
+      setImportSummary(`Importados ${summaryParts.join(' y ')} (${mergedCases.length} casos en total).`)
       onImportComplete(mergedCases)
     } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'No se pudieron transformar los archivos CSV.'
-
+      const msg = err instanceof Error ? err.message : 'No se pudieron transformar los archivos CSV.'
       setGlobalError(msg)
       onError(msg)
-
-      if (msg.includes('memos')) {
-        markError('memo', msg)
-      }
-      if (msg.includes('aristas')) {
-        markError('algo-arista', msg)
-      }
-      if (msg.includes('esquinas')) {
-        markError('algo-esquina', msg)
-      }
+      if (msg.includes('memos'))    markError('memo', msg)
+      if (msg.includes('aristas'))  markError('algo-arista', msg)
+      if (msg.includes('esquinas')) markError('algo-esquina', msg)
     } finally {
       setIsProcessing(false)
     }
@@ -207,35 +169,36 @@ export default function CSVImporter({
   }
 
   return (
-    <section
-      aria-label="Carga de archivos CSV"
-      className="flex flex-col gap-4 rounded-lg border border-white/10 bg-white/[0.035] p-4"
-    >
+    <section aria-label="Carga de archivos CSV" className="flex flex-col gap-4">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-white">Datos de practica</h2>
-          <p className="mt-1 text-sm leading-5 text-stone-400">
-            Sube el memo compartido y al menos un CSV de algoritmos. Cada archivo debe ser una
-            matriz cuadrada de 21×21 o 22×22, sin filas ni columnas extra al final.
+          <h2 className="text-sm font-semibold text-white">Datos de práctica</h2>
+          <p className="mt-0.5 text-xs leading-5 text-white/50">
+            {hasCases
+              ? 'Sube solo los archivos que quieras actualizar. El memo es opcional si ya tienes casos cargados.'
+              : 'Sube el memo y al menos un CSV de algoritmos para empezar.'}
           </p>
         </div>
         {onDismiss && (
           <button
             type="button"
             onClick={onDismiss}
-            className="grid size-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-sm font-semibold text-stone-300 transition hover:bg-white/[0.08] hover:text-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-            aria-label="Cerrar carga de archivos"
+            className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/10 text-white/60 transition hover:bg-white/20 hover:text-white focus:outline-none"
+            aria-label="Cerrar"
           >
-            x
+            ✕
           </button>
         )}
       </div>
 
-      <div className="grid gap-3">
+      {/* File drop zones */}
+      <div className="grid gap-2">
         {(['memo', 'algo-arista', 'algo-esquina'] as const).map((kind) => (
           <DropZone
             key={kind}
             label={FILE_LABELS[kind]}
+            optional={kind === 'memo' && hasCases}
             kind={kind}
             fileState={fileStates[kind]}
             inputRef={inputRefs[kind]}
@@ -246,41 +209,41 @@ export default function CSVImporter({
         ))}
       </div>
 
+      {/* Errors / success */}
       {globalError && (
-        <p
-          className="rounded-md border border-red-300/30 bg-red-400/10 px-3 py-2 text-sm text-red-100"
-          role="alert"
-        >
+        <p className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-xs text-[var(--danger)]" role="alert">
           {globalError}
         </p>
       )}
-
       {importSummary && !globalError && (
-        <p className="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-100">
+        <p className="rounded-xl border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-2 text-xs text-[var(--success)]">
           {importSummary}
         </p>
       )}
 
+      {/* Submit */}
       <button
         type="button"
         disabled={!canProcess}
         onClick={processFiles}
         className={[
-          'min-h-11 rounded-lg px-4 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+          'h-11 w-full rounded-xl text-sm font-semibold transition focus:outline-none',
           canProcess
-            ? 'cursor-pointer bg-emerald-300 text-stone-950 hover:bg-emerald-200'
-            : 'cursor-not-allowed bg-white/[0.06] text-stone-500',
+            ? 'bg-[var(--accent-sky)] text-[var(--accent)] hover:opacity-90'
+            : 'cursor-not-allowed bg-white/10 text-white/30',
         ].join(' ')}
         aria-disabled={!canProcess}
       >
-        {isProcessing ? 'Procesando...' : 'Importar casos'}
+        {isProcessing ? 'Procesando…' : 'Importar casos'}
       </button>
     </section>
   )
 }
 
+/* ─── Drop zone ─────────────────────────────────────────────────────────────── */
 function DropZone({
   label,
+  optional,
   kind,
   fileState,
   inputRef,
@@ -289,55 +252,69 @@ function DropZone({
   onInputChange,
 }: {
   label: string
+  optional: boolean
   kind: FileKind
   fileState: FileState
   inputRef: React.RefObject<HTMLInputElement | null>
-  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void
-  onDrop: (kind: FileKind) => (event: React.DragEvent<HTMLDivElement>) => void
-  onInputChange: (kind: FileKind) => (event: React.ChangeEvent<HTMLInputElement>) => void
+  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void
+  onDrop: (kind: FileKind) => (e: React.DragEvent<HTMLDivElement>) => void
+  onInputChange: (kind: FileKind) => (e: React.ChangeEvent<HTMLInputElement>) => void
 }) {
+  const hasFile = fileState.file !== null
+
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <p className="text-sm font-medium text-stone-200">{label}</p>
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-semibold text-white/80">{label}</p>
+        {optional && (
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/40">
+            opcional
+          </span>
+        )}
+      </div>
+
       <div
         role="button"
         tabIndex={0}
         aria-label={`Subir ${label}`}
         className={[
-          'relative flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-          dropzoneClass(fileState.status),
+          'relative flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40',
+          dropzoneClass(fileState.status, hasFile),
         ].join(' ')}
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
         onDragOver={onDragOver}
         onDrop={onDrop(kind)}
       >
+        {/* Icon */}
         <span
-          className="grid size-9 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-xs font-semibold text-stone-300"
+          className={[
+            'grid size-8 shrink-0 place-items-center rounded-lg text-[9px] font-bold',
+            hasFile ? 'bg-white/20 text-white' : 'bg-white/10 text-white/50',
+          ].join(' ')}
           aria-hidden="true"
         >
-          CSV
+          {fileState.status === 'success' ? '✓' : 'CSV'}
         </span>
 
-        {fileState.file ? (
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-200">
-              {fileState.status === 'success' ? 'Validado' : 'Seleccionado'}
-            </span>
-            <span className="break-all text-center text-sm text-stone-100">
-              {fileState.file.name}
-            </span>
-          </div>
-        ) : (
-          <p className="text-center text-sm leading-5 text-stone-400">
-            Arrastra el archivo o{' '}
-            <span className="text-cyan-200 underline">seleccionalo</span>
-          </p>
+        {/* Label / filename */}
+        <div className="min-w-0 flex-1">
+          {hasFile ? (
+            <p className="truncate text-xs font-semibold text-white">
+              {fileState.file!.name}
+            </p>
+          ) : (
+            <p className="text-xs text-white/40">
+              Arrastra o <span className="text-[var(--accent-sky)] underline">selecciona</span>
+            </p>
+          )}
+        </div>
+
+        {/* Status badge */}
+        {fileState.status === 'success' && (
+          <span className="shrink-0 rounded-full bg-[var(--success-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
+            OK
+          </span>
         )}
 
         <input
@@ -352,7 +329,7 @@ function DropZone({
       </div>
 
       {fileState.status === 'error' && fileState.errorMessage && (
-        <p className="text-xs text-red-200 break-words" role="alert">
+        <p className="text-[11px] text-[var(--danger)] break-words" role="alert">
           {fileState.errorMessage}
         </p>
       )}
@@ -360,8 +337,44 @@ function DropZone({
   )
 }
 
-function dropzoneClass(status: FileStatus) {
-  if (status === 'success') return 'border-emerald-300/50 bg-emerald-300/[0.06]'
-  if (status === 'error') return 'border-red-300/50 bg-red-300/[0.06]'
-  return 'border-white/15 bg-stone-950/50 hover:border-cyan-200/50 hover:bg-cyan-200/[0.04]'
+function dropzoneClass(status: FileStatus, hasFile: boolean): string {
+  if (status === 'success') return 'border-[var(--success-border)] bg-[var(--success-bg)]'
+  if (status === 'error')   return 'border-[var(--danger-border)] bg-[var(--danger-bg)]'
+  if (hasFile)              return 'border-white/25 bg-white/10'
+  return 'border-white/10 bg-white/5 hover:border-[var(--accent-sky)]/40 hover:bg-white/10'
+}
+
+/* ─── Build memo matrix from existing cases ─────────────────────────────────
+   When no new memo CSV is provided, reconstruct a minimal ParsedMatrix from
+   the memos already stored in existingCases so transformMatrices can still run.
+   This only needs the par → memo mapping, which transformMatrices uses via
+   the headers + data lookup.
+─────────────────────────────────────────────────────────────────────────── */
+import type { ParsedMatrix } from '@/app/lib/types'
+
+function buildMemoMatrixFromCases(cases: TrainingCase[]): ParsedMatrix {
+  // Collect unique letters from all pairs
+  const letterSet = new Set<string>()
+  for (const c of cases) {
+    if (c.par.length === 2) {
+      letterSet.add(c.par[0].toUpperCase())
+      letterSet.add(c.par[1].toUpperCase())
+    }
+  }
+  const letters = Array.from(letterSet).sort()
+
+  // Build an N×N data grid where data[r][c] = memo for pair letters[r]+letters[c]
+  const memoMap = new Map<string, string>()
+  for (const c of cases) {
+    memoMap.set(c.par.toUpperCase(), c.memo)
+  }
+
+  const data: string[][] = letters.map((rowLetter) =>
+    letters.map((colLetter) => memoMap.get(rowLetter + colLetter) ?? ''),
+  )
+
+  return {
+    headers: { rows: letters, columns: letters },
+    data,
+  }
 }

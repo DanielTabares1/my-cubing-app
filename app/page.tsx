@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useTheme } from '@/app/hooks/useTheme'
 
 const tools = [
   {
@@ -6,157 +9,183 @@ const tools = [
     href: '/trainer',
     status: 'Disponible',
     description:
-      'Practica pares de aristas BLD con memo, algoritmo y cronometro visual.',
-    metric: 'CSV local',
+      'Practica pares de aristas BLD con memo, algoritmo y cronómetro visual.',
+    tag: 'CSV local',
     active: true,
+    icon: '3S',
   },
   {
     name: 'Biblioteca de casos',
     href: '#',
-    status: 'Proximamente',
+    status: 'Próximamente',
     description:
       'Organiza subsets, etiquetas y notas personales para tus algoritmos.',
-    metric: 'Planificado',
+    tag: 'Planificado',
     active: false,
+    icon: '📚',
   },
   {
-    name: 'Analisis de sesiones',
+    name: 'Análisis de sesiones',
     href: '#',
-    status: 'Proximamente',
+    status: 'Próximamente',
     description:
-      'Revisa errores frecuentes, tiempos y progreso por letra o categoria.',
-    metric: 'Planificado',
+      'Revisa errores frecuentes, tiempos y progreso por letra o categoría.',
+    tag: 'Planificado',
     active: false,
+    icon: '📊',
   },
 ]
 
 export default function Home() {
+  const { isDark, toggleTheme } = useTheme()
   return (
-    <main className="min-h-screen bg-stone-950 text-stone-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between border-b border-white/10 pb-5">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-            aria-label="My Cubing Tool"
-          >
-            <span className="grid size-10 place-items-center rounded-lg bg-cyan-300 text-sm font-black text-stone-950 shadow-[0_0_28px_rgba(103,232,249,0.25)]">
+    <main className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+      {/* Top bar */}
+      <header className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6 sm:px-8">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-xs font-black text-white shadow-[0_4px_14px_rgba(62,54,176,0.35)]">
               M
             </span>
-            <span>
-              <span className="block text-sm font-semibold tracking-wide text-white">
-                My Cubing Tool
-              </span>
-              <span className="block text-xs text-stone-400">Cubing workspace</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">
+              My Cubing Tool
             </span>
-          </Link>
-
-          <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-200">
-            MVP operativo
+          </div>
+          <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-xs font-semibold text-[var(--success)]">
+            MVP activo
           </span>
-        </header>
 
-        <section className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="max-w-xl">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
-              Elige una herramienta
-            </p>
-            <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
-              Entrenamiento BLD listo para uso diario.
-            </h1>
-            <p className="mt-5 max-w-lg text-base leading-7 text-stone-300">
-              Una entrada limpia para tus utilidades de cubing. Por ahora el
-              foco esta en 3Style, con una base visual pensada para crecer sin
-              sentirse como demo.
-            </p>
+          {/* Theme toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+            className="grid size-9 place-items-center rounded-xl border border-[var(--border-muted)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          >
+            {isDark ? <IconSun /> : <IconMoon />}
+          </button>
+        </div>
+      </header>
 
-            <div className="mt-8 grid grid-cols-3 gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              <div>
-                <p className="text-2xl font-semibold text-white">3</p>
-                <p className="text-xs text-stone-400">herramientas</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-white">1</p>
-                <p className="text-xs text-stone-400">activa</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-white">100%</p>
-                <p className="text-xs text-stone-400">local</p>
-              </div>
-            </div>
+      <div className="mx-auto w-full max-w-6xl px-6 sm:px-8">
+        {/* Hero */}
+        <div className="pb-12 pt-14">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.20em] text-[var(--accent-mid)]">
+            Workspace de cubing
+          </p>
+          <h1 className="max-w-2xl text-4xl font-bold leading-tight text-[var(--text-primary)] sm:text-5xl">
+            Entrenamiento BLD{' '}
+            <span className="text-[var(--accent)]">listo para uso diario.</span>
+          </h1>
+          <p className="mt-5 max-w-lg text-base leading-7 text-[var(--text-secondary)]">
+            Herramientas locales para 3Style. Sin cuenta, sin servidor, sin distracciones.
+          </p>
+
+          {/* Stats strip */}
+          <div className="mt-8 inline-flex items-center gap-6 rounded-2xl bg-[var(--bg-surface)] px-7 py-5" style={{ boxShadow: 'var(--shadow-card)' }}>
+            <StatStrip value="3" label="herramientas" />
+            <div className="h-8 w-px bg-[var(--border-subtle)]" />
+            <StatStrip value="1" label="disponible" />
+            <div className="h-8 w-px bg-[var(--border-subtle)]" />
+            <StatStrip value="100%" label="offline" />
           </div>
+        </div>
 
-          <div className="grid gap-4">
-            {tools.map((tool) =>
-              tool.active ? (
-                <Link
-                  key={tool.name}
-                  href={tool.href}
-                  className="group rounded-lg border border-cyan-300/30 bg-cyan-300/[0.07] p-5 shadow-2xl shadow-cyan-950/30 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-200/60 hover:bg-cyan-300/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-                >
-                  <ToolCardContent tool={tool} />
-                </Link>
-              ) : (
-                <article
-                  key={tool.name}
-                  className="rounded-lg border border-white/10 bg-white/[0.025] p-5 opacity-75"
-                  data-disabled="true"
-                >
-                  <ToolCardContent tool={tool} />
-                </article>
-              ),
-            )}
-          </div>
-        </section>
+        {/* Tools grid */}
+        <div className="grid gap-5 pb-16 sm:grid-cols-2 lg:grid-cols-3">
+          {tools.map((tool) =>
+            tool.active ? (
+              <Link
+                key={tool.name}
+                href={tool.href}
+                className="group relative overflow-hidden rounded-2xl bg-[var(--bg-surface)] p-6 transition duration-200 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                style={{ boxShadow: 'var(--shadow-card)' }}
+              >
+                {/* accent stripe top */}
+                <span
+                  className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-[var(--accent)] to-[var(--accent-sky)]"
+                  aria-hidden="true"
+                />
+                <ToolContent tool={tool} />
+              </Link>
+            ) : (
+              <article
+                key={tool.name}
+                className="relative overflow-hidden rounded-2xl bg-[var(--bg-surface)] p-6 opacity-55"
+                style={{ boxShadow: 'var(--shadow-card)' }}
+              >
+                <ToolContent tool={tool} />
+              </article>
+            ),
+          )}
+        </div>
       </div>
     </main>
   )
 }
 
-function ToolCardContent({ tool }: { tool: (typeof tools)[number] }) {
+function StatStrip({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="text-xl font-bold text-[var(--accent)]">{value}</p>
+      <p className="text-xs text-[var(--text-muted)]">{label}</p>
+    </div>
+  )
+}
+
+function ToolContent({ tool }: { tool: (typeof tools)[number] }) {
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <span
-              className={[
-                'grid size-11 shrink-0 place-items-center rounded-md border font-semibold',
-                tool.active
-                  ? 'border-cyan-200/40 bg-cyan-200/15 text-cyan-100'
-                  : 'border-white/10 bg-white/[0.04] text-stone-300',
-              ].join(' ')}
-              aria-hidden="true"
-            >
-              {tool.active ? '3S' : '--'}
-            </span>
-            <div>
-              <h2 className="text-lg font-semibold text-white">{tool.name}</h2>
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-stone-400">
-                {tool.status}
-              </p>
-            </div>
-          </div>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-stone-300">
-            {tool.description}
-          </p>
-        </div>
-        <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone-300">
-          {tool.metric}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <span
+          className={[
+            'grid size-12 shrink-0 place-items-center rounded-xl text-lg font-black',
+            tool.active
+              ? 'bg-[var(--accent-lavender)] text-[var(--accent)]'
+              : 'bg-[var(--bg-overlay)] text-[var(--text-muted)]',
+          ].join(' ')}
+          aria-hidden="true"
+        >
+          {tool.icon}
+        </span>
+        <span
+          className={[
+            'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+            tool.active
+              ? 'bg-[var(--accent-lavender)] text-[var(--accent)]'
+              : 'bg-[var(--bg-overlay)] text-[var(--text-muted)]',
+          ].join(' ')}
+        >
+          {tool.tag}
         </span>
       </div>
 
+      <h2 className="text-base font-semibold text-[var(--text-primary)]">{tool.name}</h2>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{tool.description}</p>
+
       {tool.active && (
-        <div className="mt-5 flex items-center justify-between border-t border-cyan-200/10 pt-4 text-sm">
-          <span className="font-medium text-cyan-100">Abrir herramienta</span>
-          <span
-            className="grid size-8 place-items-center rounded-full bg-cyan-200 text-stone-950 transition group-hover:translate-x-1"
-            aria-hidden="true"
-          >
-            -&gt;
-          </span>
+        <div className="mt-5 flex items-center justify-between border-t border-[var(--border-subtle)] pt-4">
+          <span className="text-sm font-semibold text-[var(--accent)]">Abrir →</span>
+          <span className="text-xs font-medium text-[var(--success)]">{tool.status}</span>
         </div>
       )}
     </>
+  )
+}
+
+function IconMoon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M13.5 10A6 6 0 0 1 6 2.5a.5.5 0 0 0-.6-.6A6.5 6.5 0 1 0 14.1 10.6a.5.5 0 0 0-.6-.6Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function IconSun() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.9 11.9l1.05 1.05M12.95 3.05l-1.06 1.06M4.1 11.9l-1.05 1.05" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
   )
 }
